@@ -9,7 +9,15 @@ import openai
 from io import BytesIO
 from PIL import Image
 import urllib.parse
+import configparser
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Get API keys from environment
+PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -24,10 +32,10 @@ logger = logging.getLogger(__name__)
 PEXELS_API_KEY = "YOUR_PEXELS_API_KEY"  # Replace with your Pexels API key
 
 class FlashcardGenerator:
-    def __init__(self, api_key: str, output_dir: str = "output"):
+    def __init__(self, output_dir: str = "output"):
         """Initialize the flashcard generator with OpenAI API key and output directory."""
-        self.api_key = api_key
-        self.client = openai.OpenAI(api_key=api_key)
+        self.api_key = os.environ.get("OPENAI_API_KEY")
+        self.client = openai.OpenAI(api_key=self.api_key)
         self.output_dir = output_dir
         
         # Create output directory if it doesn't exist
@@ -262,6 +270,7 @@ class FlashcardGenerator:
         
         # Card 1: Definition cloze
         definition_card = {
+            "word": word,
             "text": f"{{{{c1::{word}}}}} - {definition}",
             "type": "cloze"
         }
@@ -270,6 +279,7 @@ class FlashcardGenerator:
         # Card 2: Examples cloze
         examples_text = "\n".join([f"• {example.replace(word, f'{{{{c1::{word}}}}}')}" for example in examples])
         examples_card = {
+            "word": word,
             "text": examples_text,
             "type": "cloze"
         }
@@ -282,6 +292,14 @@ class FlashcardGenerator:
             "type": "basic"
         }
         cards.append(image_card)
+        
+        # Card 4: Image to word (Basic reversed)
+        image_card_reversed = {
+            "front": f'<img src="{image_path}">',
+            "back": word,
+            "type": "basic"
+        }
+        cards.append(image_card_reversed)
         
         return cards
     
@@ -336,15 +354,34 @@ class FlashcardGenerator:
             csv_path = os.path.join(self.output_dir, "flashcards.csv")
             
             with open(csv_path, 'w', newline='', encoding='utf-8') as file:
-                # Determine all possible fields from all cards
-                fieldnames = set()
-                for card in cards:
-                    fieldnames.update(card.keys())
+                # Write headers for Anki import
+                file.write('#separator:Tab\n')
+                file.write('#html:true\n')
+                file.write('#note column:1\n')
                 
-                fieldnames = list(fieldnames)
-                writer = csv.DictWriter(file, fieldnames=fieldnames)
-                writer.writeheader()
-                writer.writerows(cards)
+                # Define the fieldnames for the CSV
+                fieldnames = ['type', '2', '3']
+                writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='\t')
+                #writer.writeheader()
+                
+                for card in cards:
+                    # Map the card dictionary to the CSV format
+                    if card["type"] == "cloze":
+                        writer.writerow({
+                            'type': "cloze",
+                            '2': card.get('text'),
+                        })
+                    elif card["type"] == "basic":
+                        writer.writerow({
+                            'type': "basic",
+                            '2': card.get('front'),
+                            '3': card.get('back')
+                        })
+                        writer.writerow({
+                            'type': "basic",
+                            '2': card.get('back'),
+                            '3': card.get('front')
+                        })
             
             logger.info(f"Wrote {len(cards)} flashcards to {csv_path}")
         
@@ -355,11 +392,10 @@ def main():
     parser = argparse.ArgumentParser(description='Generate Anki flashcards from BCS words.')
     parser.add_argument('--words', type=str, default='words.txt', help='Path to the input words file')
     parser.add_argument('--output', type=str, default='output', help='Output directory')
-    parser.add_argument('--api-key', type=str, required=True, help='OpenAI API key')
     
     args = parser.parse_args()
     
-    generator = FlashcardGenerator(api_key=args.api_key, output_dir=args.output)
+    generator = FlashcardGenerator(output_dir=args.output)
     generator.generate_flashcards(args.words)
 
 if __name__ == "__main__":
