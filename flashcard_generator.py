@@ -11,6 +11,7 @@ from PIL import Image
 import urllib.parse
 import configparser
 from dotenv import load_dotenv
+import sys
 
 # Load environment variables from .env file
 load_dotenv()
@@ -18,6 +19,7 @@ load_dotenv()
 # Get API keys from environment
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -28,8 +30,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-PEXELS_API_KEY = "YOUR_PEXELS_API_KEY"  # Replace with your Pexels API key
 
 class FlashcardGenerator:
     def __init__(self, output_dir: str = "output"):
@@ -54,42 +54,67 @@ class FlashcardGenerator:
             logger.error(f"Error reading words from {filepath}: {e}")
             return []
     
+    def api_request(self, model: str, messages: list, temperature: float, max_tokens: int):
+        """Wrapper for OpenAI API requests with error handling and retry logic."""
+        while True:
+            try:
+                response = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                # Respect API rate limits
+                time.sleep(0.12)  # Wait 120 milliseconds to ensure no more than 500 requests per minute
+                return response
+            
+            except openai.error.RateLimitError as e:
+                if e.http_status == 429 and e.error.code == 'insufficient_quota':
+                    logger.error("Insufficient quota. Exiting program.")
+                    sys.exit(1)
+                else:
+                    logger.warning(f"Rate limit error: {e}. Retrying in 0.12 seconds.")
+                    time.sleep(0.12)  # Wait before retrying
+            
+            except Exception as e:
+                logger.error(f"Error during API request: {e}")
+                return None
+
     def generate_definition(self, word: str) -> str:
         """Generate a definition for a word using OpenAI API."""
-        try:
-            prompt = f"""
-            Word: {word}
+        prompt = f"""
+        Word: {word}
 
-            Please provide a clear, natural-sounding definition of this word in Bosnian/Croatian/Serbian (ijekavian variant).
+        Please provide a clear, natural-sounding definition of this word in Bosnian/Croatian/Serbian (ijekavian variant).
 
-            If the word is not in its canonical form, convert it to the canonical form (nominative for nouns,
-            infinitive for verbs) before defining it.
+        If the word is not in its canonical form, convert it to the canonical form (nominative for nouns,
+        infinitive for verbs) before defining it.
 
-            The definition can be one or more sentences, depending on the complexity or abstractness of the word.
+        The definition can be one or more sentences, depending on the complexity or abstractness of the word.
 
-            Use cloze formatting around only the word being defined, like {{c1::riječ}}.
+        Use cloze formatting around only the word being defined, like {{c1::riječ}}.
 
-            Use everyday, idiomatic language — do not sound like a dictionary. Do not include headings, synonyms,
-            bullet points, or extra formatting. Just the definition.
+        Use everyday, idiomatic language — do not sound like a dictionary. Do not include headings, synonyms,
+        bullet points, or extra formatting. Just the definition.
 
-            Example:
-            Input: "činom"
-            Output: {{c1::Čin}} je radnja ili djelo koje neko namjerno izvrši. Može biti dobar, loš, svjestan ili nepromišljen.
-            """
+        Example:
+        Input: "činom"
+        Output: {{c1::Čin}} je radnja ili djelo koje neko namjerno izvrši. Može biti dobar, loš, svjestan ili nepromišljen.
+        """
 
-            response = self.client.chat.completions.create(
-                model="gpt-4",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=300
-            )
-            
+        response = self.api_request(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=300
+        )
+        
+        if response:
             definition = response.choices[0].message.content.strip()
             logger.info(f"Generated definition for '{word}'")
             return definition
-        
-        except Exception as e:
-            logger.error(f"Error generating definition for '{word}': {e}")
+        else:
+            logger.error(f"Failed to generate definition for '{word}'")
             return ""
     
     def generate_examples(self, word: str) -> List[str]:
@@ -123,11 +148,13 @@ class FlashcardGenerator:
 
             
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=800
             )
+            # Respect API rate limits
+            time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             content = response.choices[0].message.content
             
@@ -164,11 +191,13 @@ class FlashcardGenerator:
             """
 
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=10
             )
+            # Respect API rate limits
+            time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             word_type = response.choices[0].message.content.strip().upper()
             logger.info(f"Word '{word}' classified as: {word_type}")
@@ -180,7 +209,7 @@ class FlashcardGenerator:
                 return self._get_web_image(word, image_path)
             # For complex abstract words, generate with DALL-E
             else:
-                return self._generate_dalle_image(word, None, image_path)
+                return self._generate_dalle_image(word, image_path)
             
         except Exception as e:
             logger.error(f"Error getting image for '{word}': {e}")
@@ -189,15 +218,34 @@ class FlashcardGenerator:
     def _get_web_image(self, word: str, image_path: str) -> Optional[str]:
         """Get an image from the Pexels API for concrete objects."""
         try:
+            # First, translate the word to English using ChatGPT
+            translation_prompt = f"""
+            Translate the following Bosnian/Croatian/Serbian word to English: "{word}"
+            Return only the English translation, no other text.
+            """
+            translation_response = self.api_request(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": translation_prompt}],
+                temperature=0.3,
+                max_tokens=10
+            )
+            
+            if translation_response:
+                translated_word = translation_response.choices[0].message.content.strip()
+                logger.info(f"Translated '{word}' to '{translated_word}'")
+            else:
+                logger.error(f"Failed to translate '{word}'")
+                return None
+
             # Pexels API endpoint and headers
             api_url = "https://api.pexels.com/v1/search"
             headers = {
                 "Authorization": PEXELS_API_KEY
             }
             
-            # Search for images using the word
+            # Search for images using the translated word
             params = {
-                "query": word,
+                "query": translated_word,
                 "per_page": 1  # Get only one image
             }
             
@@ -207,11 +255,11 @@ class FlashcardGenerator:
             # Parse the response to get the image URL
             data = response.json()
             if not data['photos']:
-                logger.warning(f"No images found for '{word}' on Pexels.")
+                logger.warning(f"No images found for '{translated_word}' on Pexels.")
                 return None
             
             image_url = data['photos'][0]['src']['original']
-            logger.info(f"Found image URL for '{word}': {image_url}")
+            logger.info(f"Found image URL for '{translated_word}': {image_url}")
             
             # Download and save the image
             img_response = requests.get(image_url)
@@ -249,6 +297,8 @@ class FlashcardGenerator:
                 quality="standard",
                 n=1,
             )
+            # Respect API rate limits
+            time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             image_url = response.data[0].url
             
@@ -293,14 +343,6 @@ class FlashcardGenerator:
         }
         cards.append(image_card)
         
-        # Card 4: Image to word (Basic reversed)
-        image_card_reversed = {
-            "front": f'<img src="{image_path}">',
-            "back": word,
-            "type": "basic"
-        }
-        cards.append(image_card_reversed)
-        
         return cards
     
     def generate_flashcards(self, words_file: str) -> None:
@@ -311,7 +353,8 @@ class FlashcardGenerator:
             return
         
         all_cards = []
-        
+        request_count = 0  # Track the number of requests made
+
         for word in words:
             try:
                 logger.info(f"Processing word: {word}")
@@ -338,8 +381,11 @@ class FlashcardGenerator:
                 cards = self.create_anki_cards(word, definition, examples, os.path.basename(image_path))
                 all_cards.extend(cards)
                 
-                # Respect API rate limits
-                time.sleep(1)
+                # Increment request count and check rate limits
+                request_count += 3  # Assuming each word requires 3 API calls
+                if request_count >= 200:
+                    logger.warning("Reached daily request limit. Stopping further processing.")
+                    break
                 
             except Exception as e:
                 logger.error(f"Error processing word '{word}': {e}")
@@ -351,7 +397,8 @@ class FlashcardGenerator:
     def write_to_csv(self, cards: List[Dict]) -> None:
         """Write flashcards to a CSV file for Anki import."""
         try:
-            csv_path = os.path.join(self.output_dir, "flashcards.csv")
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            csv_path = os.path.join(self.output_dir, f"flashcards_{timestamp}.csv")
             
             with open(csv_path, 'w', newline='', encoding='utf-8') as file:
                 # Write headers for Anki import
