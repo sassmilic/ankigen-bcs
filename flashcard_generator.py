@@ -20,9 +20,12 @@ load_dotenv()
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
+# Define global variable for Anki collection path
+ANKI_COLLECTION_FILE_PATH = os.path.expanduser(os.environ.get("ANKI_COLLECTION_FILE_PATH"))
+
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("output/flashcard_generator.log"),
@@ -92,14 +95,14 @@ class FlashcardGenerator:
 
         The definition can be one or more sentences, depending on the complexity or abstractness of the word.
 
-        Use cloze formatting around only the word being defined, like {{c1::riječ}}.
+        Use cloze formatting around only the word being defined, like {{{{c1::riječ}}}}.
 
         Use everyday, idiomatic language — do not sound like a dictionary. Do not include headings, synonyms,
         bullet points, or extra formatting. Just the definition.
 
         Example:
         Input: "činom"
-        Output: {{c1::Čin}} je radnja ili djelo koje neko namjerno izvrši. Može biti dobar, loš, svjestan ili nepromišljen.
+        Output: {{{{c1::Čin}}}} je radnja ili djelo koje neko namjerno izvrši. Može biti dobar, loš, svjestan ili nepromišljen.
         """
 
         response = self.api_request(
@@ -120,8 +123,7 @@ class FlashcardGenerator:
     def generate_examples(self, word: str) -> List[str]:
         """Generate example sentences using OpenAI API."""
         try:
-            prompt = f"""
-            Word: {word}
+            prompt = "Word: " + word + "\n\n" + """
 
             Please provide 2–5 example sentences in Bosnian/Croatian/Serbian (ijekavian variant)
             showing different meanings and usage of this word. Provide more examples if the word
@@ -136,7 +138,8 @@ class FlashcardGenerator:
             Avoid overly complex or unnatural phrasing.
 
             Do not include any numbering, bullet points, or explanations — just a list of clean
-            example sentences, each on a new line.
+            example sentences, each on a new line. EACH SENTENCE MUST BE ON A NEW LINE.
+            NOTE THAT CLOZE BRACKETS HAVE TWO LEFT BRACKETS ("{{") AND TWO RIGHT BRACKETS ("}}").
 
             Example:
             Input: "čin"
@@ -154,13 +157,15 @@ class FlashcardGenerator:
                 max_tokens=800
             )
             # Respect API rate limits
-            time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
+            #time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             content = response.choices[0].message.content
             
             # Process the response to extract examples
             examples = []
             for line in content.strip().split('\n'):
+                # Log the line for debugging
+                logger.debug("Processing example line: " + line)
                 line = line.strip()
                 if not line:
                     continue
@@ -197,7 +202,8 @@ class FlashcardGenerator:
                 max_tokens=10
             )
             # Respect API rate limits
-            time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
+            # TODO
+            #time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             word_type = response.choices[0].message.content.strip().upper()
             logger.info(f"Word '{word}' classified as: {word_type}")
@@ -206,7 +212,7 @@ class FlashcardGenerator:
             
             # For simple concrete words, fetch from the web
             if "SIMPLE" in word_type:
-                return self._get_web_image(word, image_path)
+                return self._get_web_image(word)
             # For complex abstract words, generate with DALL-E
             else:
                 return self._generate_dalle_image(word, image_path)
@@ -215,7 +221,7 @@ class FlashcardGenerator:
             logger.error(f"Error getting image for '{word}': {e}")
             return None
 
-    def _get_web_image(self, word: str, image_path: str) -> Optional[str]:
+    def _get_web_image(self, word: str) -> Optional[str]:
         """Get an image from the Pexels API for concrete objects."""
         try:
             # First, translate the word to English using ChatGPT
@@ -261,9 +267,13 @@ class FlashcardGenerator:
             image_url = data['photos'][0]['src']['original']
             logger.info(f"Found image URL for '{translated_word}': {image_url}")
             
+            # Define the image path
+            image_path = os.path.join(ANKI_COLLECTION_FILE_PATH, f"{word}_image.png")
+            
             # Download and save the image
             img_response = requests.get(image_url)
             img = Image.open(BytesIO(img_response.content))
+            logger.info(f"Saving image to {image_path}")
             img.save(image_path)
             
             logger.info(f"Retrieved Pexels image for '{word}' to {image_path}")
@@ -321,13 +331,13 @@ class FlashcardGenerator:
         # Card 1: Definition cloze
         definition_card = {
             "word": word,
-            "text": f"{{{{c1::{word}}}}} - {definition}",
+            "text": definition,
             "type": "cloze"
         }
         cards.append(definition_card)
         
         # Card 2: Examples cloze
-        examples_text = "\n".join([f"• {example.replace(word, f'{{{{c1::{word}}}}}')}" for example in examples])
+        examples_text = "<ul>" + "".join(["<li>" + example + "</li>" for example in examples]) + "</ul>"
         examples_card = {
             "word": word,
             "text": examples_text,
@@ -353,7 +363,6 @@ class FlashcardGenerator:
             return
         
         all_cards = []
-        request_count = 0  # Track the number of requests made
 
         for word in words:
             try:
@@ -380,12 +389,7 @@ class FlashcardGenerator:
                 # Create Anki cards
                 cards = self.create_anki_cards(word, definition, examples, os.path.basename(image_path))
                 all_cards.extend(cards)
-                
-                # Increment request count and check rate limits
-                request_count += 3  # Assuming each word requires 3 API calls
-                if request_count >= 200:
-                    logger.warning("Reached daily request limit. Stopping further processing.")
-                    break
+
                 
             except Exception as e:
                 logger.error(f"Error processing word '{word}': {e}")
@@ -404,33 +408,41 @@ class FlashcardGenerator:
                 # Write headers for Anki import
                 file.write('#separator:Tab\n')
                 file.write('#html:true\n')
-                file.write('#note column:1\n')
+                file.write('#notetype column:1\n')
                 
                 # Define the fieldnames for the CSV
                 fieldnames = ['type', '2', '3']
                 writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='\t')
                 #writer.writeheader()
                 
+                # IMPORTANT: According to Anki documentation:
+                # "Anki determines the number of fields in the file by looking at the first (non-commented) line.
+                # If some of the later records in the file contain fewer fields, Anki will treat the missing fields
+                # as if they were blank. If some of your records contain extra fields, the extra content will not
+                # be imported."
+                #
+                # Therefore, we must put the card type with more fields (basic) first to ensure all fields are properly
+                # recognized during import.
                 for card in cards:
                     # Map the card dictionary to the CSV format
-                    if card["type"] == "cloze":
+                    if card["type"] == "basic":
                         writer.writerow({
-                            'type': "cloze",
-                            '2': card.get('text'),
-                        })
-                    elif card["type"] == "basic":
-                        writer.writerow({
-                            'type': "basic",
+                            'type': "Basic",
                             '2': card.get('front'),
                             '3': card.get('back')
                         })
                         writer.writerow({
-                            'type': "basic",
+                            'type': "Basic",
                             '2': card.get('back'),
                             '3': card.get('front')
                         })
+                    elif card["type"] == "cloze":
+                        writer.writerow({
+                            'type': "Cloze",
+                            '2': card.get('text'),
+                        })
             
-            logger.info(f"Wrote {len(cards)} flashcards to {csv_path}")
+            logger.info(f"Wrote {len(cards) * 4/3} flashcards to {csv_path}")
         
         except Exception as e:
             logger.error(f"Error writing to CSV: {e}")
