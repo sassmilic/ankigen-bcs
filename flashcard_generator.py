@@ -1,17 +1,16 @@
-import os
-import csv
-import time
-import logging
 import argparse
-import requests
-from typing import List, Dict, Tuple, Optional
-import openai
-from io import BytesIO
-from PIL import Image
-import urllib.parse
-import configparser
-from dotenv import load_dotenv
+import csv
+import logging
+import os
 import sys
+import time
+from io import BytesIO
+from typing import List, Dict, Optional
+
+import openai
+import requests
+from PIL import Image
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
