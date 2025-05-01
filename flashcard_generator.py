@@ -25,7 +25,7 @@ ANKI_COLLECTION_FILE_PATH = os.path.expanduser(os.environ.get("ANKI_COLLECTION_F
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("output/flashcard_generator.log"),
@@ -90,19 +90,18 @@ class FlashcardGenerator:
 
         Please provide a clear, natural-sounding definition of this word in Bosnian/Croatian/Serbian (ijekavian variant).
 
-        If the word is not in its canonical form, convert it to the canonical form (nominative for nouns,
+        Notes: 
+        - If the word is not in its canonical form, convert it to the canonical form (nominative for nouns,
         infinitive for verbs) before defining it.
-
-        The definition can be one or more sentences, depending on the complexity or abstractness of the word.
-
-        Use cloze formatting around only the word being defined, like {{{{c1::riječ}}}}.
-
-        Use everyday, idiomatic language — do not sound like a dictionary. Do not include headings, synonyms,
-        bullet points, or extra formatting. Just the definition.
+        - The definition can be one or more sentences, depending on the complexity or abstractness of the word.
+        - If the word is simple, keep the definition short and concise.
+        - Otherwise, if the word is abstract, polysemous, or emotionally rich, generate a longer definition, as necessary.
+        - Use cloze formatting around only the word being defined, like {{{{c1::riječ}}}}.
+        - Do not include headings, synonyms, bullet points, or extra formatting. Just the definition.
 
         Example:
-        Input: "činom"
-        Output: {{{{c1::Čin}}}} je radnja ili djelo koje neko namjerno izvrši. Može biti dobar, loš, svjestan ili nepromišljen.
+        Input: "čin"
+        Output: {{{{c1::Čin}}}} je radnja ili djelo koje neko namjerno izvrši.
         """
 
         response = self.api_request(
@@ -129,17 +128,17 @@ class FlashcardGenerator:
             showing different meanings and usage of this word. Provide more examples if the word
             is abstract or has multiple meanings.
 
-            Use the word in its canonical form (e.g., nominative for nouns, infinitive for verbs), even
-            if the input is in a different form.
-
-            Use cloze formatting ({{c1::...}}) around only the word being defined in each sentence.
-
-            Each sentence should be natural, idiomatic, and positive or life-affirming when appropriate.
-            Avoid overly complex or unnatural phrasing.
-
-            Do not include any numbering, bullet points, or explanations — just a list of clean
-            example sentences, each on a new line. EACH SENTENCE MUST BE ON A NEW LINE.
-            NOTE THAT CLOZE BRACKETS HAVE TWO LEFT BRACKETS ("{{") AND TWO RIGHT BRACKETS ("}}").
+            - If the word is abstract, polysemous, or emotionally rich, generate **more** (up to 5) sentences
+              covering its different uses—literal, figurative, idiomatic, emotional, social, etc.
+            - If, however, the word is simple and concrete, generate **less** (up to 3) sentences.
+            - Show the word in **different grammatical forms**:  
+                - For verbs: use varied conjugations (tenses, moods, persons).  
+                - For nouns: use different cases.
+            - Wrap only the target word in cloze formatting (`{{c1::…}}`) in each sentence.  
+            - Each sentence should be positive and life-affirming when appropriate.
+            - Avoid overly complex or unnatural phrasing.
+            - **Every sentence must appear on its own line**, with **no** numbering, bullet points, or commentary.  
+            - **Reminder:** cloze brackets require two left braces (`{{`) and two right braces (`}}`).  
 
             Example:
             Input: "čin"
@@ -180,7 +179,7 @@ class FlashcardGenerator:
     
     def get_image(self, word: str) -> Optional[str]:
         """Get an appropriate image for the word - either from web sources for concrete nouns
-        or generated with DALL-E for abstract concepts."""
+        or generated with AIfor abstract concepts."""
         try:
             # First, have GPT determine if the word is concrete or abstract
             prompt = f"""
@@ -208,14 +207,13 @@ class FlashcardGenerator:
             word_type = response.choices[0].message.content.strip().upper()
             logger.info(f"Word '{word}' classified as: {word_type}")
             
-            image_path = os.path.join(self.output_dir, f"{word}_image.png")
-            
             # For simple concrete words, fetch from the web
             if "SIMPLE" in word_type:
                 return self._get_web_image(word)
-            # For complex abstract words, generate with DALL-E
+            # For complex abstract words, generate image with AI
             else:
-                return self._generate_dalle_image(word, image_path)
+                image_path = os.path.join(ANKI_COLLECTION_FILE_PATH, f"{word}_image.png")
+                return self._generate_image(word, image_path)
             
         except Exception as e:
             logger.error(f"Error getting image for '{word}': {e}")
@@ -283,32 +281,29 @@ class FlashcardGenerator:
             logger.error(f"Error getting Pexels image for '{word}': {e}")
             return None
 
-    def _generate_dalle_image(self, word: str, image_path: str) -> Optional[str]:
-        """Generate an image using DALL-E for abstract concepts."""
+    def _generate_image(self, word: str, image_path: str) -> Optional[str]:
+        """Generate an image using AI for abstract concepts."""
         try:
-            # Create a detailed prompt for DALL-E based on the word
             prompt = f"""
             Create a clear, simple image that visually represents the meaning of the BCS (Bosnian/Croatian/Serbian) word: "{word}"
             
             Important:
-            - NO English words in the image
-            - Do not include the word being defined in the image
+            - NO text in the image. DO NOT INCLUDE ANY TEXT IN THE IMAGE.
             - Focus on the core meaning, not literal translation.
-            - If the word is abstract, express the *feeling* or symbolic meaning creatively
+            - If the word is abstract, express the *feeling* or symbolic meaning creatively.
             - If the word has multiple meanings, try to represent them all in a single image
-            - If the word is a verb or implies time-based action, consider a multi-panel (comic strip) layout to show sequence
             """
-            
-            logger.info(f"Generating DALL-E image for '{word}'")
+
+            # If the word is a verb or implies time-based action, consider a multi-panel (comic strip) layout to show sequence
+            # ^^^ might only be a good idea with gpt-image-1
+
+            logger.info(f"Generating image for '{word}'")
             response = self.client.images.generate(
-                model="dall-e-3",
+                model="dall-e-3", # TODO: change to "gpt-image-1"
                 prompt=prompt,
-                size="1024x1024",
-                quality="standard",
-                n=1,
             )
             # Respect API rate limits
-            time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
+            # time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             image_url = response.data[0].url
             
@@ -317,11 +312,11 @@ class FlashcardGenerator:
             img = Image.open(BytesIO(response.content))
             img.save(image_path)
             
-            logger.info(f"Generated and saved DALL-E image for '{word}' to {image_path}")
+            logger.info(f"Generated and saved image for '{word}' to {image_path}")
             return image_path
             
         except Exception as e:
-            logger.error(f"Error generating DALL-E image for '{word}': {e}")
+            logger.error(f"Error generating image for '{word}': {e}")
             return None
     
     def create_anki_cards(self, word: str, definition: str, examples: List[str], image_path: str) -> List[Dict]:
@@ -380,7 +375,7 @@ class FlashcardGenerator:
                     logger.warning(f"Skipping word '{word}' due to missing examples")
                     continue
                 
-                # Get appropriate image (web or DALL-E)
+                # Get appropriate image (web or AI-gen)
                 image_path = self.get_image(word)
                 if not image_path:
                     logger.warning(f"Skipping word '{word}' due to missing image")
