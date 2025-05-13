@@ -12,6 +12,15 @@ import requests
 from PIL import Image
 from dotenv import load_dotenv
 
+# Import prompts
+from prompts import (
+    DEFINITION_PROMPT,
+    EXAMPLES_PROMPT,
+    WORD_TYPE_PROMPT,
+    TRANSLATION_PROMPT,
+    IMAGE_GENERATION_PROMPT
+)
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -83,25 +92,14 @@ class FlashcardGenerator:
                 return None
 
     def generate_definition(self, word: str) -> str:
-        """Generate a definition for a word using OpenAI API."""
-        prompt = f"""
-        Word: {word}
-
-        Please provide a clear, natural-sounding definition of this word in Bosnian/Croatian/Serbian (ijekavian variant).
-
-        Notes: 
-        - If the word is not in its canonical form, convert it to the canonical form (nominative for nouns,
-        infinitive for verbs) before defining it.
-        - The definition can be one or more sentences, depending on the complexity or abstractness of the word.
-        - If the word is simple, keep the definition short and concise.
-        - Otherwise, if the word is abstract, polysemous, or emotionally rich, generate a longer definition, as necessary.
-        - Use cloze formatting around only the word being defined, like {{{{c1::riječ}}}}.
-        - Do not include headings, synonyms, bullet points, or extra formatting. Just the definition.
-
-        Example:
-        Input: "čin"
-        Output: {{{{c1::Čin}}}} je radnja ili djelo koje neko namjerno izvrši.
         """
+        Generate a definition for a word using OpenAI API.
+        
+        Precondition: The word is spelled correctly (including diacritics)
+        and in canonical form (nominative case if noun and infinitive if verb).
+        """
+
+        prompt = DEFINITION_PROMPT.format(word=word)
 
         response = self.api_request(
             model="gpt-4o",
@@ -121,32 +119,7 @@ class FlashcardGenerator:
     def generate_examples(self, word: str) -> List[str]:
         """Generate example sentences using OpenAI API."""
         try:
-            prompt = "Word: " + word + "\n\n" + """
-
-            Please provide 2–5 example sentences in Bosnian/Croatian/Serbian (ijekavian variant)
-            showing different meanings and usage of this word. Provide more examples if the word
-            is abstract or has multiple meanings.
-
-            - If the word is abstract, polysemous, or emotionally rich, generate **more** (up to 5) sentences
-              covering its different uses—literal, figurative, idiomatic, emotional, social, etc.
-            - If, however, the word is simple and concrete, generate **less** (up to 3) sentences.
-            - Show the word in **different grammatical forms**:  
-                - For verbs: use varied conjugations (tenses, moods, persons).  
-                - For nouns: use different cases.
-            - Wrap only the target word in cloze formatting (`{{c1::…}}`) in each sentence.  
-            - Each sentence should be positive and life-affirming when appropriate.
-            - Avoid overly complex or unnatural phrasing.
-            - **Every sentence must appear on its own line**, with **no** numbering, bullet points, or commentary.  
-            - **Reminder:** cloze brackets require two left braces (`{{`) and two right braces (`}}`).  
-
-            Example:
-            Input: "čin"
-            Output:
-            {{c1::Čin}} hrabrosti je prepoznat i nagrađen.  
-            Njegov {{c1::čin}} nije prošao nezapaženo u zajednici.  
-            Svaki {{c1::čin}} ima svoje posljedice, bilo dobre ili loše.
-            """
-
+            prompt = EXAMPLES_PROMPT.format(word=word)
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -154,8 +127,6 @@ class FlashcardGenerator:
                 temperature=0.7,
                 max_tokens=800
             )
-            # Respect API rate limits
-            #time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             content = response.choices[0].message.content
             
@@ -181,17 +152,7 @@ class FlashcardGenerator:
         or generated with AIfor abstract concepts."""
         try:
             # First, have GPT determine if the word is concrete or abstract
-            prompt = f"""
-            Word: {word}
-
-            Determine if this word represents:
-            1. A simple, concrete, visible object (like 'jabuka', 'mačka', 'kuća')
-            2. An abstract concept, action, quality, emotion, or complex idea (like 'ljubav', 'misliti', 'sloboda')
-
-            Respond with only one word: either SIMPLE or COMPLEX (in all caps, no punctuation or explanation).
-
-            If unsure, choose COMPLEX.
-            """
+            prompt = WORD_TYPE_PROMPT.format(word=word)
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -199,9 +160,6 @@ class FlashcardGenerator:
                 temperature=0.1,
                 max_tokens=10
             )
-            # Respect API rate limits
-            # TODO
-            #time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             word_type = response.choices[0].message.content.strip().upper()
             logger.info(f"Word '{word}' classified as: {word_type}")
@@ -222,10 +180,7 @@ class FlashcardGenerator:
         """Get an image from the Pexels API for concrete objects."""
         try:
             # First, translate the word to English using ChatGPT
-            translation_prompt = f"""
-            Translate the following Bosnian/Croatian/Serbian word to English: "{word}"
-            Return only the English translation, no other text.
-            """
+            translation_prompt = TRANSLATION_PROMPT.format(word=word)
             translation_response = self.api_request(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": translation_prompt}],
@@ -283,26 +238,13 @@ class FlashcardGenerator:
     def _generate_image(self, word: str, image_path: str) -> Optional[str]:
         """Generate an image using AI for abstract concepts."""
         try:
-            prompt = f"""
-            Create a clear, simple image that visually represents the meaning of the BCS (Bosnian/Croatian/Serbian) word: "{word}"
-            
-            Important:
-            - NO text in the image. DO NOT INCLUDE ANY TEXT IN THE IMAGE.
-            - Focus on the core meaning, not literal translation.
-            - If the word is abstract, express the *feeling* or symbolic meaning creatively.
-            - If the word has multiple meanings, try to represent them all in a single image
-            """
-
-            # If the word is a verb or implies time-based action, consider a multi-panel (comic strip) layout to show sequence
-            # ^^^ might only be a good idea with gpt-image-1
+            prompt = IMAGE_GENERATION_PROMPT.format(word=word)
 
             logger.info(f"Generating image for '{word}'")
             response = self.client.images.generate(
                 model="dall-e-3", # TODO: change to "gpt-image-1"
                 prompt=prompt,
             )
-            # Respect API rate limits
-            # time.sleep(20)  # Wait 20 seconds to ensure no more than 3 requests per minute
             
             image_url = response.data[0].url
             
@@ -357,6 +299,8 @@ class FlashcardGenerator:
             return
         
         all_cards = []
+        successful_words = []
+        skipped_words = {}  # Dictionary to track skipped words and reasons
 
         for word in words:
             try:
@@ -366,31 +310,48 @@ class FlashcardGenerator:
                 definition = self.generate_definition(word)
                 if not definition:
                     logger.warning(f"Skipping word '{word}' due to missing definition")
+                    skipped_words[word] = "missing definition"
                     continue
                 
                 # Generate examples
                 examples = self.generate_examples(word)
                 if not examples:
                     logger.warning(f"Skipping word '{word}' due to missing examples")
+                    skipped_words[word] = "missing examples"
                     continue
                 
                 # Get appropriate image (web or AI-gen)
                 image_path = self.get_image(word)
                 if not image_path:
                     logger.warning(f"Skipping word '{word}' due to missing image")
+                    skipped_words[word] = "missing image"
                     continue
                 
                 # Create Anki cards
                 cards = self.create_anki_cards(word, definition, examples, os.path.basename(image_path))
                 all_cards.extend(cards)
-
+                successful_words.append(word)
                 
             except Exception as e:
                 logger.error(f"Error processing word '{word}': {e}")
+                skipped_words[word] = f"error: {str(e)}"
                 continue
         
         # Write all cards to CSV
         self.write_to_csv(all_cards)
+        
+        # Log summary
+        card_count = len(all_cards)
+        logger.info("=" * 50)
+        logger.info(f"FLASHCARD GENERATION SUMMARY:")
+        logger.info(f"Successfully processed {len(successful_words)} words")
+        logger.info(f"Generated {card_count} flashcards")
+        
+        if skipped_words:
+            logger.info(f"Skipped {len(skipped_words)} words:")
+            for word, reason in skipped_words.items():
+                logger.info(f"  - '{word}': {reason}")
+        logger.info("=" * 50)
     
     def write_to_csv(self, cards: List[Dict]) -> None:
         """Write flashcards to a CSV file for Anki import."""
