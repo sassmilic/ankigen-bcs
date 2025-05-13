@@ -22,17 +22,13 @@ from prompts import (
     CANONICALIZATION_PROMPT
 )
 
-# Load environment variables from .env file
 load_dotenv()
 
-# Get API keys from environment
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
-# Define global variable for Anki collection path
 ANKI_COLLECTION_FILE_PATH = os.path.expanduser(os.environ.get("ANKI_COLLECTION_FILE_PATH"))
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -50,7 +46,6 @@ class FlashcardGenerator:
         self.client = openai.OpenAI(api_key=self.api_key)
         self.output_dir = output_dir
         
-        # Create output directory if it doesn't exist
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
             logger.info(f"Created output directory: {output_dir}")
@@ -131,7 +126,6 @@ class FlashcardGenerator:
             
             content = response.choices[0].message.content
             
-            # Process the response to extract examples
             examples = []
             for line in content.strip().split('\n'):
                 # Log the line for debugging
@@ -165,10 +159,8 @@ class FlashcardGenerator:
             word_type = response.choices[0].message.content.strip().upper()
             logger.info(f"Word '{word}' classified as: {word_type}")
             
-            # For simple concrete words, fetch from the web
             if "SIMPLE" in word_type:
                 return self._get_web_image(word)
-            # For complex abstract words, generate image with AI
             else:
                 image_path = os.path.join(ANKI_COLLECTION_FILE_PATH, f"{word}_image.png")
                 return self._generate_image(word, image_path)
@@ -196,22 +188,19 @@ class FlashcardGenerator:
                 logger.error(f"Failed to translate '{word}'")
                 return None
 
-            # Pexels API endpoint and headers
             api_url = "https://api.pexels.com/v1/search"
             headers = {
                 "Authorization": PEXELS_API_KEY
             }
             
-            # Search for images using the translated word
             params = {
                 "query": translated_word,
-                "per_page": 1  # Get only one image
+                "per_page": 1
             }
             
             response = requests.get(api_url, headers=headers, params=params)
-            response.raise_for_status()  # Raise an error for bad responses
+            response.raise_for_status()
             
-            # Parse the response to get the image URL
             data = response.json()
             if not data['photos']:
                 logger.warning(f"No images found for '{translated_word}' on Pexels.")
@@ -220,10 +209,8 @@ class FlashcardGenerator:
             image_url = data['photos'][0]['src']['original']
             logger.info(f"Found image URL for '{translated_word}': {image_url}")
             
-            # Define the image path
             image_path = os.path.join(ANKI_COLLECTION_FILE_PATH, f"{word}_image.png")
             
-            # Download and save the image
             img_response = requests.get(image_url)
             img = Image.open(BytesIO(img_response.content))
             logger.info(f"Saving image to {image_path}")
@@ -249,7 +236,6 @@ class FlashcardGenerator:
             
             image_url = response.data[0].url
             
-            # Download and save the image
             response = requests.get(image_url)
             img = Image.open(BytesIO(response.content))
             img.save(image_path)
@@ -300,10 +286,8 @@ class FlashcardGenerator:
             # Join the words into a single string for the prompt
             words_text = "\n".join(words)
             
-            # Create the prompt with the words
             prompt = CANONICALIZATION_PROMPT.format(words=words_text)
             
-            # Send to language model
             response = self.api_request(
                 model="o4-mini",
                 messages=[{"role": "user", "content": prompt}],
@@ -315,7 +299,6 @@ class FlashcardGenerator:
                 logger.error("Failed to preprocess words, using original words")
                 return words
             
-            # Process the response to get canonicalized words
             processed_content = response.choices[0].message.content.strip()
             canonicalized_words = [word.strip() for word in processed_content.split('\n') if word.strip()]
             
@@ -340,7 +323,6 @@ class FlashcardGenerator:
             logger.error("No words found in input file.")
             return
         
-        # Preprocess words to canonical form
         words = self.preprocess_words(raw_words)
         logger.info(f"Starting flashcard generation for {len(words)} preprocessed words")
         
@@ -352,28 +334,24 @@ class FlashcardGenerator:
             try:
                 logger.info(f"Processing word: {word}")
                 
-                # Generate definition
                 definition = self.generate_definition(word)
                 if not definition:
                     logger.warning(f"Skipping word '{word}' due to missing definition")
                     skipped_words[word] = "missing definition"
                     continue
                 
-                # Generate examples
                 examples = self.generate_examples(word)
                 if not examples:
                     logger.warning(f"Skipping word '{word}' due to missing examples")
                     skipped_words[word] = "missing examples"
                     continue
                 
-                # Get appropriate image (web or AI-gen)
                 image_path = self.get_image(word)
                 if not image_path:
                     logger.warning(f"Skipping word '{word}' due to missing image")
                     skipped_words[word] = "missing image"
                     continue
                 
-                # Create Anki cards
                 cards = self.create_anki_cards(word, definition, examples, os.path.basename(image_path))
                 all_cards.extend(cards)
                 successful_words.append(word)
@@ -383,7 +361,6 @@ class FlashcardGenerator:
                 skipped_words[word] = f"error: {str(e)}"
                 continue
         
-        # Write all cards to CSV
         self.write_to_csv(all_cards)
         
         # Log summary
@@ -411,10 +388,8 @@ class FlashcardGenerator:
                 file.write('#html:true\n')
                 file.write('#notetype column:1\n')
                 
-                # Define the fieldnames for the CSV
                 fieldnames = ['type', '2', '3']
                 writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='\t')
-                #writer.writeheader()
                 
                 # IMPORTANT: According to Anki documentation:
                 # "Anki determines the number of fields in the file by looking at the first (non-commented) line.
