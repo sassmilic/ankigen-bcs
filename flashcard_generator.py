@@ -224,29 +224,30 @@ class FlashcardGenerator:
             return None
 
     def _generate_image(self, word: str, image_path: str) -> Optional[str]:
-        """Generate an image using AI for abstract concepts."""
+        """Generate a low-resolution (256x256) image using AI for abstract concepts."""
         try:
             prompt = IMAGE_GENERATION_PROMPT.format(word=word)
 
             logger.info(f"Generating image for '{word}'")
             response = self.client.images.generate(
-                model="dall-e-3", # TODO: change to "gpt-image-1"
+                model="dall-e-3",
                 prompt=prompt,
+                size="256x256" # lowest cost/quality tier
             )
-            
+
             image_url = response.data[0].url
-            
+
             response = requests.get(image_url)
             img = Image.open(BytesIO(response.content))
             img.save(image_path)
-            
+
             logger.info(f"Generated and saved image for '{word}' to {image_path}")
             return image_path
-            
+
         except Exception as e:
-            logger.error(f"Error generating image for '{word}': {e}")
+            logger.error(f"Failed to generate image for '{word}': {e}")
             return None
-    
+
     def create_anki_cards(self, word: str, definition: str, examples: List[str], image_path: str) -> List[Dict]:
         """Create Anki flashcards for a word with definition, examples, and image."""
         cards = []
