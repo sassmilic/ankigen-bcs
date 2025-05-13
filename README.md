@@ -1,6 +1,17 @@
 # ankigen-bcs
 
-auto-generate anki cards for language learning
+This tool generates Anki flashcards for learning Bosnian/Croatian/Serbian (BCS) vocabulary from a given list of words.
+
+For each word, it creates four types of flashcards:
+
+1. Definition (cloze deletion) – a clear, natural-sounding definition in BCS with the target word hidden.
+2. Example sentences (cloze deletion) – 2–3 sentences using the word in context, with the word hidden.
+3. Image-to-word
+4. Word-to-image
+
+Images are either retrieved from Pexels or AI-generated, depending on the word type.
+
+The output is a CSV file formatted for batch importing into Anki, requiring minimal manual setup.
 
 ## Usage
 
@@ -14,6 +25,7 @@ auto-generate anki cards for language learning
    ```
 4. Create a `words.txt` file with one word per line that you want to generate flashcards for.
 5. Run the flashcard generator script:
+
 ```
 python flashcard_generator.py
 ```
@@ -26,6 +38,6 @@ python flashcard_generator.py
 - organize output files /& directories
 - consider widening the types of words that can be represented with simple online images, i.e. don't need to be generated.
 - cut costs
-   - batch generation (i.e. send all words with one prompt)
-   - shorten/compress prompts
-   - leverage pexel more; generate fewer images 
+  - batch generation (i.e. send all words with one prompt)
+  - shorten/compress prompts
+  - leverage pexel more; generate fewer images
