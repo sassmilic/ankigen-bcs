@@ -18,7 +18,8 @@ from prompts import (
     EXAMPLES_PROMPT,
     WORD_TYPE_PROMPT,
     TRANSLATION_PROMPT,
-    IMAGE_GENERATION_PROMPT
+    IMAGE_GENERATION_PROMPT,
+    CANONICALIZATION_PROMPT
 )
 
 # Load environment variables from .env file
@@ -102,7 +103,7 @@ class FlashcardGenerator:
         prompt = DEFINITION_PROMPT.format(word=word)
 
         response = self.api_request(
-            model="gpt-4o",
+            model="o4-mini",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=300
@@ -122,7 +123,7 @@ class FlashcardGenerator:
             prompt = EXAMPLES_PROMPT.format(word=word)
             
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="o4-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=800
@@ -155,7 +156,7 @@ class FlashcardGenerator:
             prompt = WORD_TYPE_PROMPT.format(word=word)
 
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="o4-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.1,
                 max_tokens=10
@@ -182,7 +183,7 @@ class FlashcardGenerator:
             # First, translate the word to English using ChatGPT
             translation_prompt = TRANSLATION_PROMPT.format(word=word)
             translation_response = self.api_request(
-                model="gpt-4o",
+                model="o4-mini",
                 messages=[{"role": "user", "content": translation_prompt}],
                 temperature=0.3,
                 max_tokens=10
@@ -291,12 +292,57 @@ class FlashcardGenerator:
         
         return cards
     
+    def preprocess_words(self, words: List[str]) -> List[str]:
+        """Preprocess words to ensure they are in canonical form with correct diacritics."""
+        try:
+            logger.info(f"Preprocessing {len(words)} words to canonical form")
+            
+            # Join the words into a single string for the prompt
+            words_text = "\n".join(words)
+            
+            # Create the prompt with the words
+            prompt = CANONICALIZATION_PROMPT.format(words=words_text)
+            
+            # Send to language model
+            response = self.api_request(
+                model="o4-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=1000
+            )
+            
+            if not response:
+                logger.error("Failed to preprocess words, using original words")
+                return words
+            
+            # Process the response to get canonicalized words
+            processed_content = response.choices[0].message.content.strip()
+            canonicalized_words = [word.strip() for word in processed_content.split('\n') if word.strip()]
+            
+            logger.info(f"Preprocessed {len(words)} words to {len(canonicalized_words)} canonical forms")
+            
+            # Log the changes for review
+            for original, canonical in zip(words, canonicalized_words):
+                if original != canonical:
+                    logger.info(f"Word changed: '{original}' → '{canonical}'")
+            
+            return canonicalized_words
+            
+        except Exception as e:
+            logger.error(f"Error preprocessing words: {e}")
+            logger.warning("Using original words due to preprocessing error")
+            return words
+    
     def generate_flashcards(self, words_file: str) -> None:
         """Generate flashcards for all words in the input file."""
-        words = self.read_words(words_file)
-        if not words:
+        raw_words = self.read_words(words_file)
+        if not raw_words:
             logger.error("No words found in input file.")
             return
+        
+        # Preprocess words to canonical form
+        words = self.preprocess_words(raw_words)
+        logger.info(f"Starting flashcard generation for {len(words)} preprocessed words")
         
         all_cards = []
         successful_words = []

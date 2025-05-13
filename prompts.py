@@ -1,33 +1,31 @@
 # Prompt for generating definitions
 DEFINITION_PROMPT = """
-Word: {word}
+Please provide a clear, natural-sounding definition of the word "{word}" in
+Bosnian/Croatian/Serbian (ijekavian variant), using the following rules:
 
-Please provide a clear, natural-sounding definition of this word in Bosnian/Croatian/Serbian (ijekavian variant) using these rules:
-- For simple, concrete words (e.g. "jabuka", "jezikoslovlje"), write a single concise sentence.
-- For abstract, polysemous, or emotionally rich words (e.g. "obasjati", "beskonačnost"), give a more detailed definition covering literal and figurative senses.
-- Enclose only the target word in cloze format: {{c1::riječ}}.
-- Do not add headings, bullet lists, synonyms, or extra formatting—just the definition.
-
-Examples:   
-Input: "jabuka"  
-Output: {{c1::Jabuka}} je plod voćke koji je hrskav, sočan i raste na drvetu.
-
-Input: "jezikoslovlje"  
-Output: {{c1::Jezikoslovlje}} je nauka koja proučava strukturu, upotrebu i razvoj jezika.
-
-Input: "obasjati"  
-Output: {{c1::Obasjati}} znači osvetliti nešto sjajnom svjetlošću, ali i preneseno označava ispuniti nečiju dušu radošću ili nadahnućem.
-
-Input: "beskonačnost"  
-Output: {{c1::Beskonačnost}} označava svojstvo nečega što nema granica ili kraja, poput beskonačnog niza brojeva ili neprekidnog prostora. U prenesenom smislu opisuje vječnost, neograničene mogućnosti ili neiscrpnu količinu ideja.
+- The first word in your definition should be the word "{word}" in cloze format.
+- Begin by indicating the part of speech (e.g. noun, verb, adjective, adverb).
+- If relevant, include brief linguistic context (e.g. archaic, literary, dialectal, formal, colloquial, etc.).
+- If relevant, indicate whether the word is more commonly used or stylistically marked in Croatian, Serbian, or Bosnian
+  (e.g., if it feels formal in one variety but colloquial in another, or if it's more frequent in one standard than the others).
+- If the word is concrete and simple (e.g. jabuka, stolica), write one concise sentence that defines it clearly and accurately.
+    - Example: {{{{c1::Jabuka}}}} je plod voćke koji je hrskav, sočan i raste na drvetu.
+    - Example: {{{{c1::Trčati}}}} je radnja kojom se krećemo brže od hodanja, koristeći obje noge naizmjenično.
+- If the word is abstract, polysemous, idiomatic, or emotionally rich (e.g. obasjati, zanos, slutnja),
+  provide a slightly longer definition that covers both literal and figurative or extended meanings.
+    - Example: {{{{c1::Obasjati}}}} znači osvetliti nešto sjajnom svjetlošću,
+      ali i preneseno označava ispuniti nečiju dušu radošću ili nadahnućem.
+    - Example: {{{{c1::Zanos}}}} označava osjećaj snažnog uzbuđenja ili entuzijazma,
+      ali također može značiti i stanje potpune koncentracije ili posvećenosti nečemu.
+- Surround *only* the word being defined in cloze format like this: {{{{c1::riječ}}}}.
+- If helpful, use simple comparisons or clarify metaphors (e.g., "kao kad…" or "poput…").
+- Do not include headings, synonyms, usage examples, or extra formatting.
 """
 
 # Prompt for generating example sentences
 EXAMPLES_PROMPT = """
-Word: {word}
-
 Please provide 2–5 example sentences in Bosnian/Croatian/Serbian (ijekavian variant)
-showing different meanings and usage of this word. Provide more examples if the word
+showing different meanings and usage of the word "{word}". Provide more examples if the word
 is abstract or has multiple meanings.
 
 - If the word is abstract, polysemous, or emotionally rich, generate **more** (up to 5) sentences
@@ -36,18 +34,18 @@ is abstract or has multiple meanings.
 - Show the word in **different grammatical forms**:  
     - For verbs: use varied conjugations (tenses, moods, persons).  
     - For nouns: use different cases.
-- Wrap only the target word in cloze formatting (`{{c1::…}}`) in each sentence.  
+- Wrap only the target word in cloze formatting (`{{{{c1::…}}}}) in each sentence.  
 - Each sentence should be positive and life-affirming when appropriate.
 - Avoid overly complex or unnatural phrasing.
 - **Every sentence must appear on its own line**, with **no** numbering, bullet points, or commentary.  
-- **Reminder:** cloze brackets require two left braces (`{{`) and two right braces (`}}`).  
+- **Reminder:** cloze brackets require two left braces (`{{{{`) and two right braces (`}}}}`).  
 
 Example:
 Input: "čin"
 Output:
-{{c1::Čin}} hrabrosti je prepoznat i nagrađen.  
-Njegov {{c1::čin}} nije prošao nezapaženo u zajednici.  
-Svaki {{c1::čin}} ima svoje posljedice, bilo dobre ili loše.
+{{{{c1::Čin}}}} hrabrosti je prepoznat i nagrađen.  
+Njegov {{{{c1::čin}}}} nije prošao nezapaženo u zajednici.  
+Svaki {{{{c1::čin}}}} ima svoje posljedice, bilo dobre ili loše.
 """
 
 # Prompt for determining if a word is concrete or abstract
@@ -75,4 +73,20 @@ Create a clear, simple image that visually represents the meaning of the BCS (Bo
 
 Important:
 - NO text in the image. DO NOT INCLUDE ANY TEXT IN THE IMAGE.
-""" 
+"""
+
+# Prompt for canonicalizing words
+CANONICALIZATION_PROMPT = """
+You are given a list of words in Bosnian/Croatian/Serbian. For each word, return its canonical (dictionary) form with correct diacritics, following these rules:
+
+- Nouns → convert to singular nominative
+- Verbs → convert to infinitive
+- Adjectives → convert to masculine singular nominative
+- Other words → return in their base form as found in a standard dictionary
+- All output words must be lowercase
+- Return exactly one word per line
+- Return only the transformed words, with no additional text or formatting
+
+Input:
+{words}
+"""
