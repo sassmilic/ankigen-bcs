@@ -4,14 +4,14 @@ This tool generates Anki flashcards for learning Bosnian/Croatian/Serbian (BCS) 
 
 For each word, it creates four types of flashcards:
 
-1. Definition (cloze deletion) – a clear, natural-sounding definition in BCS with the target word hidden.
-2. Example sentences (cloze deletion) – 2–3 sentences using the word in context, with the word hidden.
+1. Definition (cloze deletion) – a definition in BCS with the target word hidden.
+2. Example sentences (cloze deletion) – 3–5 sentences using the word in context, with the word hidden.
 3. Image-to-word
 4. Word-to-image
 
 Images are either retrieved from Pexels or AI-generated, depending on the word type.
 
-The output is a CSV file formatted for batch importing into Anki, requiring minimal manual setup.
+The output is a CSV file formatted for batch importing into Anki.
 
 ## Usage
 
