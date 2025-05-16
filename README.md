@@ -42,3 +42,4 @@ python flashcard_generator.py
   - ~~shorten/compress prompts~~
   - leverage pexel more; generate fewer images
 - Request certain visual markers for nouns, adjectives, verbs, etc
+- Parallel process image generation
