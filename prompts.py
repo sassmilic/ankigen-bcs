@@ -24,21 +24,16 @@ Bosnian/Croatian/Serbian (ijekavian variant), using the following rules:
 
 # Prompt for generating example sentences
 EXAMPLES_PROMPT = """
-Please provide 2–5 example sentences in Bosnian/Croatian/Serbian (ijekavian variant)
-showing different meanings and usage of the word "{word}". Provide more examples if the word
-is abstract or has multiple meanings.
+Please provide 3 example sentences in Bosnian/Croatian/Serbian (ijekavian variant)
+showing different meanings and usage of the word "{word}".
 
-- If the word is abstract, polysemous, or emotionally rich, generate **more** (up to 5) sentences
-  covering its different uses—literal, figurative, idiomatic, emotional, social, etc.
-- If, however, the word is simple and concrete, generate **less** (up to 3) sentences.
+- If the word is abstract, polysemous, or emotionally rich, generate sentences
+  that cover its different uses: literal, figurative, idiomatic, etc.
 - Show the word in **different grammatical forms**:  
     - For verbs: use varied conjugations (tenses, moods, persons).  
     - For nouns: use different cases.
 - Wrap only the target word in cloze formatting (`{{{{c1::…}}}}) in each sentence.  
 - Each sentence should be positive and life-affirming when appropriate.
-- Avoid overly complex or unnatural phrasing.
-- **Every sentence must appear on its own line**, with **no** numbering, bullet points, or commentary.  
-- **Reminder:** cloze brackets require two left braces (`{{{{`) and two right braces (`}}}}`).  
 
 Example:
 Input: "čin"
@@ -69,10 +64,17 @@ Return only the English translation, no other text.
 
 # Prompt for generating images
 IMAGE_GENERATION_PROMPT = """
-Create a clear, simple image that visually represents the meaning of the BCS (Bosnian/Croatian/Serbian) word: "{word}"
+Create a symbolic image that visually captures the meaning or emotional tone of the
+BCS (Bosnian/Croatian/Serbian) word: "{word}".
 
-Important:
-- NO text in the image. DO NOT INCLUDE ANY TEXT IN THE IMAGE.
+The image should evoke the concept either:
+- Metaphorically, if the word is abstract, polysemous, or emotionally rich, or
+- Literally and directly, if the word is concrete, simple, or object-based.
+
+Requirements:
+- The image must be distinctive and specific, so that a language learner can confidentlyassociate it with this word and not confuse it with similar words.
+- Do NOT include any text or writing in the image unless it is essential to convey the word's meaning.
+- The visual should feel emotionally resonant, clean, and visually clear, suitable for use on a vocabulary flashcard.
 """
 
 # Prompt for canonicalizing words
