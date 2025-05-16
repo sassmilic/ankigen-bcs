@@ -41,3 +41,4 @@ python flashcard_generator.py
   - ~~batch generation (i.e. send all words with one prompt)~~
   - ~~shorten/compress prompts~~
   - leverage pexel more; generate fewer images
+- Request certain visual markers for nouns, adjectives, verbs, etc
