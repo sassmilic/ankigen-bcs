@@ -33,11 +33,11 @@ python flashcard_generator.py
 ## TODO
 
 - deal with duplicates (i.e. don't regenerate)
-- parallelize requests
-- consider just using a single prompt per word (mono-prompt hehe)
+- ~~parallelize requests~~
+- ~~consider just using a single prompt per word (mono-prompt hehe)~~
 - organize output files /& directories
 - consider widening the types of words that can be represented with simple online images, i.e. don't need to be generated.
 - cut costs
-  - batch generation (i.e. send all words with one prompt)
-  - shorten/compress prompts
+  - ~~batch generation (i.e. send all words with one prompt)~~
+  - ~~shorten/compress prompts~~
   - leverage pexel more; generate fewer images
