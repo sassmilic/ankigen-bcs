@@ -17,7 +17,7 @@ Define the word in Bosnian/Croatian/Serbian (ijekavian variant) using cloze form
 - Start the definition with the word in cloze brackets: `{{{{c1::word}}}}`
 - Follow it with grammatical info in parentheses:
   - Verbs: (glagol, aspect, 1st person singular present) — the present form must also be in cloze, e.g. `(glagol, svršeni vid, {{{{c1::prodrijem}}}})`
-  - Nouns: (imenica, gender), and note if uncountable
+  - Nouns: (imenica) include gender only if irregular (e.g. female noun not ending in -a), and note if uncountable
   - Adjectives: (pridjev, degree), e.g., pozitiv, komparativ, superlativ
 - Include dialectal or stylistic notes only if relevant (e.g., mostly used in Bosnia)
 - For concrete words, write a one-sentence definition

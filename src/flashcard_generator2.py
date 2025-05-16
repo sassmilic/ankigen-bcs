@@ -1,8 +1,8 @@
 import argparse
 import csv
+import json
 import logging
 import os
-import sys
 import time
 from io import BytesIO
 from typing import List, Dict, Optional
@@ -29,6 +29,18 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+HISTORY_FILE = "output/flashcard_history.jsonl"
+
+def load_history() -> Dict[str, Dict]:
+    if not os.path.exists(HISTORY_FILE):
+        return {}
+    with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+        return {entry['canonical_form']: entry for entry in map(json.loads, f)}
+
+def save_history_entry(entry: Dict):
+    with open(HISTORY_FILE, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(entry) + "\n")
 
 class FlashcardGenerator:
     def __init__(self, output_dir: str = "output"):
@@ -170,9 +182,12 @@ class FlashcardGenerator:
         results = self.process_words_in_batches(words, batch_size)
         
         logger.info(f"Creating flashcards for {len(results)} processed words")
+
+        history = load_history()
+
         for word_obj in results:
             word = word_obj.get("canonical_form")
-            if not word:
+            if not word or word in history:
                 continue
             translation = word_obj.get("translation", word)
             logger.info(f"Processing word '{word}' with translation '{translation}'")
@@ -182,6 +197,13 @@ class FlashcardGenerator:
             cards = self.create_anki_cards(word_obj, os.path.basename(image_path))
             all_cards.extend(cards)
 
+            save_history_entry({
+                "canonical_form": word,
+                "translation": translation,
+                "image_path": os.path.basename(image_path),
+                "anki_created": True
+            })
+            
         self.write_to_csv(all_cards)
 
     def write_to_csv(self, cards: List[Dict]) -> None:

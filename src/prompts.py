@@ -64,14 +64,13 @@ Return only the English translation, no other text.
 
 # Prompt for generating images
 IMAGE_GENERATION_PROMPT = """
-Create a symbolic image that visually captures the meaning and emotional tone of the BCS (Bosnian/Croatian/Serbian) word: "{word}".
+Create an image that visually captures the meaning of the BCS (Bosnian/Croatian/Serbian) word: "{word}".
 
 Use the following rules:
 
 1. **Interpretation style**:
    - If the word is abstract, emotional, or polysemous, illustrate it using a recognizable situation, character, or emotional metaphor.
-      - Do NOT use abstract patterns, mandalas, geometric symbols, surreal or floating shapes.
-      - Instead, show a **human figure, natural setting, or object in context** that evokes the feeling or concept.
+      - Show a **human figure, natural setting, or object in context** that evokes the feeling or concept.
       - Prefer narrative or emotional metaphor (e.g., a person walking alone under stars for “sloboda”), not visual abstraction.
    - If the word is concrete, simple, or object-based, depict it literally and clearly.
 
@@ -86,20 +85,13 @@ Use the following rules:
    Apply these visual conventions based on the part of speech (if known or inferable from the word):
 
    - **Verb**: Depict action or transformation over time. Use a comic strip, storyboard, or a subject in dynamic motion across a sequence.
-   - **Noun**: Show a centered object or scene, clearly framed or labeled visually (like a display, tag, shelf, or setting).
-   - **Adjective**: Show a person or character expressing the quality or emotional tone (e.g., posture, expression, clothing, color tint).
+   - **Noun**: Show a centered object or scene, clearly framed.
+   - **Adjective**: 
+      - Show a person or character with a facial expression that clearly conveys the adjective's emotional or descriptive quality.
+      - Use the background environment, color palette, or visual texture to reinforce the mood or tone — e.g., stormy skies for “tužan”, vibrant flowers for “vedar”, rigid geometric patterns for “strogi”.
+      - The figure should be visually dominant, but the background must add symbolic weight to the meaning.
    - **Adverb**: Show a scene with overlay effects (e.g., motion blur, shadows, symbols of time or intensity).
    - **Function word** (e.g., preposition, pronoun): Use abstract diagrams, arrows, or mirrored/reflexive imagery to illustrate relationships or directionality.
-
-5. **Composition**:
-   - Use clean visual lines, coherent lighting, and emotionally resonant composition.
-   - Ensure the central subject is easily identifiable without clutter or distractions.
-
-6. **Image formatting**:
-   - The image should be square (1024x1024).
-   - Avoid hyperrealism; favor clarity and symbolism over photorealistic noise.
-
-Your response should consist only of the image description.
 """
 
 # Prompt for canonicalizing words
