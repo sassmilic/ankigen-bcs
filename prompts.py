@@ -64,17 +64,42 @@ Return only the English translation, no other text.
 
 # Prompt for generating images
 IMAGE_GENERATION_PROMPT = """
-Create a symbolic image that visually captures the meaning or emotional tone of the
-BCS (Bosnian/Croatian/Serbian) word: "{word}".
+Create a symbolic image that visually captures the meaning and emotional tone of the BCS (Bosnian/Croatian/Serbian) word: "{word}".
 
-The image should evoke the concept either:
-- Metaphorically, if the word is abstract, polysemous, or emotionally rich, or
-- Literally and directly, if the word is concrete, simple, or object-based.
+Use the following rules:
 
-Requirements:
-- The image must be distinctive and specific, so that a language learner can confidentlyassociate it with this word and not confuse it with similar words.
-- Do NOT include any text or writing in the image unless it is essential to convey the word's meaning.
-- The visual should feel emotionally resonant, clean, and visually clear, suitable for use on a vocabulary flashcard.
+1. **Interpretation style**:
+   - If the word is abstract, emotional, or polysemous, illustrate it using a recognizable situation, character, or emotional metaphor.
+      - Do NOT use abstract patterns, mandalas, geometric symbols, surreal or floating shapes.
+      - Instead, show a **human figure, natural setting, or object in context** that evokes the feeling or concept.
+      - Prefer narrative or emotional metaphor (e.g., a person walking alone under stars for “sloboda”), not visual abstraction.
+   - If the word is concrete, simple, or object-based, depict it literally and clearly.
+
+2. **Visual clarity**:
+   - The image must be **distinctive and unambiguous**, so a language learner can associate it confidently with this word.
+   - Avoid scenes that could plausibly represent other common vocabulary.
+
+3. **No text**:
+   - Do NOT include any written language or labels in the image.
+
+4. **Stylistic consistency by part of speech**:
+   Apply these visual conventions based on the part of speech (if known or inferable from the word):
+
+   - **Verb**: Depict action or transformation over time. Use a comic strip, storyboard, or a subject in dynamic motion across a sequence.
+   - **Noun**: Show a centered object or scene, clearly framed or labeled visually (like a display, tag, shelf, or setting).
+   - **Adjective**: Show a person or character expressing the quality or emotional tone (e.g., posture, expression, clothing, color tint).
+   - **Adverb**: Show a scene with overlay effects (e.g., motion blur, shadows, symbols of time or intensity).
+   - **Function word** (e.g., preposition, pronoun): Use abstract diagrams, arrows, or mirrored/reflexive imagery to illustrate relationships or directionality.
+
+5. **Composition**:
+   - Use clean visual lines, coherent lighting, and emotionally resonant composition.
+   - Ensure the central subject is easily identifiable without clutter or distractions.
+
+6. **Image formatting**:
+   - The image should be square (1024x1024).
+   - Avoid hyperrealism; favor clarity and symbolism over photorealistic noise.
+
+Your response should consist only of the image description.
 """
 
 # Prompt for canonicalizing words

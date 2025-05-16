@@ -25,8 +25,8 @@ Define the word in Bosnian/Croatian/Serbian (ijekavian variant) using cloze form
 - Use comparisons if helpful (e.g., "kao kad...", "poput...")
 
 **Examples:**
-- `{{{{c1::Prodrijeti}}}} (glagol, svršeni vid, {{{{c1::prodrijem}}}}) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju).`
-- `{{{{c1::Blagostanje}}}} (imenica, srednji rod, nebrojivo) označava stanje u kojem osoba ili zajednica ima dovoljno sredstava za udoban, siguran i zadovoljavajući život — materijalno, emocionalno i duhovno.`
+- `{{{{c1::Prodrijeti}}}} ({{{{c1::prodrijem}}}}) (glagol, svršeni vid) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju).`
+- `{{{{c1::Blagostanje}}}} (imenica, nebrojivo) označava stanje u kojem osoba ili zajednica ima dovoljno sredstava za udoban, siguran i zadovoljavajući život — materijalno, emocionalno i duhovno.`
 - `{{{{c1::Najvažniji}}}} (pridjev, superlativ) opisuje ono što ima najveći značaj ili prioritet u odnosu na sve druge stvari u određenom kontekstu.`
 
 3. **Example sentences**
