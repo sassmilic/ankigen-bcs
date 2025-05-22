@@ -22,49 +22,60 @@ from prompts import (
     PROMPT_EXAMPLE_SENTENCES,
 )
 
-load_dotenv()
+# Import the new config module
+import src.config as config
 
-PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-ANKI_COLLECTION_FILE_PATH = os.path.expanduser(os.environ.get("ANKI_COLLECTION_FILE_PATH"))
+# Helper function to ensure a directory exists
+def _ensure_dir_exists(file_path: str):
+    directory = os.path.dirname(file_path)
+    if directory and not os.path.exists(directory):
+        os.makedirs(directory)
+
+# Ensure essential directories exist before logging or other operations
+_ensure_dir_exists(config.LOG_FILE_PATH)
+_ensure_dir_exists(config.HISTORY_FILE_PATH)
+if config.ANKI_COLLECTION_FILE_PATH: # ANKI_COLLECTION_FILE_PATH is a directory itself
+    os.makedirs(config.ANKI_COLLECTION_FILE_PATH, exist_ok=True)
+
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("../output/flashcard_generator.log"),
+        logging.FileHandler(config.LOG_FILE_PATH),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
-HISTORY_FILE = "../output/flashcard_history.jsonl"
+# HISTORY_FILE = "../output/flashcard_history.jsonl" # Moved to config
 
 def load_history() -> Dict[str, Dict]:
-    if not os.path.exists(HISTORY_FILE):
+    if not os.path.exists(config.HISTORY_FILE_PATH):
         return {}
-    with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+    with open(config.HISTORY_FILE_PATH, 'r', encoding='utf-8') as f:
         return {entry['canonical_form']: entry for entry in map(json.loads, f)}
 
 def save_history_entry(entry: Dict):
-    with open(HISTORY_FILE, 'a', encoding='utf-8') as f:
+    with open(config.HISTORY_FILE_PATH, 'a', encoding='utf-8') as f:
         f.write(json.dumps(entry) + "\n")
 
 class FlashcardGenerator:
-    def __init__(self, output_dir: str = "../output"):
-        self.api_key = OPENAI_API_KEY
+    def __init__(self, output_dir: str = None):
+        self.api_key = config.OPENAI_API_KEY
         self.client = openai.OpenAI(api_key=self.api_key)
-        self.output_dir = output_dir
+        self.output_dir = output_dir if output_dir is not None else config.DEFAULT_OUTPUT_DIR
         
-        # Rate limiting for gpt-image-1 (20 images per minute)
-        self.image_rate_limit = 20
-        self.image_rate_period = 60  # seconds
+        # Rate limiting for image generation
+        self.image_rate_limit = config.IMAGE_API_RATE_LIMIT
+        self.image_rate_period = config.IMAGE_API_RATE_PERIOD
         self.image_lock = threading.Lock()
         self.last_image_timestamps = []
 
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-            logger.info(f"Created output directory: {output_dir}")
+        # Ensure the specific output_dir for CSVs exists
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+            logger.info(f"Created output directory for CSVs: {self.output_dir}")
 
     def read_words(self, filepath: str) -> List[str]:
         with open(filepath, 'r', encoding='utf-8') as file:
@@ -81,14 +92,31 @@ class FlashcardGenerator:
                 )
                 return response
             except openai.error.RateLimitError as e:
-                logger.warning(f"Rate limit exceeded, waiting 30 seconds: {e}")
-                time.sleep(30)
+                logger.warning(f"Rate limit exceeded, waiting {config.API_RETRY_DELAY} seconds: {e}")
+                time.sleep(config.API_RETRY_DELAY)
             except Exception as e:
                 logger.error(f"API error: {e}")
                 return None
 
     def _make_api_call_and_parse(self, prompt_content: str, model: str, temperature: float, word_count: int) -> Optional[List[Dict]]:
-        """Helper function to make an API call and parse its JSON response."""
+        """Helper function to make an API call and parse its JSON response.
+        
+        Makes an API request with the given prompt and parses the JSON response.
+        Logs debug information about the request and response.
+        
+        Args:
+            prompt_content: The prompt text to send to the API
+            model: The model name to use for the request
+            temperature: The temperature setting for response generation
+            word_count: Number of words being processed (for logging)
+            
+        Returns:
+            List of dictionaries parsed from the JSON response, or None if parsing fails
+            
+        Raises:
+            JSONDecodeError: If the response cannot be parsed as valid JSON
+            ValueError: If the parsed JSON is not a list as expected
+        """
         logger.debug(f"Sending API request with prompt content:\n{prompt_content[:500]}...") # Log beginning of prompt
         response = self.api_request(
             model=model,
@@ -99,7 +127,6 @@ class FlashcardGenerator:
 
         if not response or not response.choices:
             logger.error("API request returned empty or invalid response for a sub-prompt.")
-            return None
         
         content = response.choices[0].message.content
         logger.debug(f"Raw API response content for sub-prompt:\n{content}")
@@ -109,19 +136,17 @@ class FlashcardGenerator:
             parsed_json = json.loads(content)
             if not isinstance(parsed_json, list):
                 logger.error(f"Parsed JSON is not a list as expected. Content: {content}")
-                return None
             return parsed_json
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON from sub-prompt response: {e}\nContent was: {content}")
-            return None
 
     def batch_process_words(self, words: List[str]) -> List[Dict]:
         if not words:
             return []
             
         word_list_str = ", ".join(f'"{w}"' for w in words) # Ensure words are quoted if they contain spaces/special chars for the list
-        model = "gpt-4-turbo" 
-        temperature = 0.4
+        model = config.GPT_MODEL 
+        temperature = config.GPT_TEMPERATURE
 
         merged_data = {word: {"word": word} for word in words}
         
@@ -201,7 +226,7 @@ class FlashcardGenerator:
 
         return final_batch_results
 
-    def process_words_in_batches(self, words: List[str], batch_size: int = 10) -> List[Dict]:
+    def process_words_in_batches(self, words: List[str], batch_size: int = config.DEFAULT_BATCH_SIZE) -> List[Dict]:
         """Process words in batches of specified size."""
         results = []
         total_words = len(words)
@@ -214,8 +239,8 @@ class FlashcardGenerator:
             
             # Add a small delay between batches to avoid rate limiting
             if i + batch_size < total_words:
-                logger.info(f"Waiting 3 seconds before next batch...")
-                time.sleep(3)
+                logger.info(f"Waiting {config.INTER_BATCH_DELAY} seconds before next batch...")
+                time.sleep(config.INTER_BATCH_DELAY)
                 
         return results
 
@@ -231,7 +256,10 @@ class FlashcardGenerator:
             return self._get_web_image(word, translation)
         else:
             # Find existing image files for this word and determine the next number
-            image_dir = ANKI_COLLECTION_FILE_PATH
+            image_dir = config.ANKI_COLLECTION_FILE_PATH
+            if not image_dir:
+                logger.error("ANKI_COLLECTION_FILE_PATH is not set in config. Cannot save AI generated images.")
+                return None
             existing_files = [f for f in os.listdir(image_dir) if f.startswith(f"{word}_image")]
             
             # Get the numbers from existing files
@@ -260,14 +288,17 @@ class FlashcardGenerator:
     def _get_web_image(self, word: str, translation: str) -> Optional[str]:
         try:
             api_url = "https://api.pexels.com/v1/search"
-            headers = {"Authorization": PEXELS_API_KEY}
+            headers = {"Authorization": config.PEXELS_API_KEY}
             params = {"query": translation, "per_page": 1}
             response = requests.get(api_url, headers=headers, params=params)
             data = response.json()
             if not data['photos']:
                 return None
             image_url = data['photos'][0]['src']['original']
-            image_path = os.path.join(ANKI_COLLECTION_FILE_PATH, f"{word}_image.png")
+            image_path = os.path.join(config.ANKI_COLLECTION_FILE_PATH, f"{word}_image.png")
+            if not config.ANKI_COLLECTION_FILE_PATH:
+                logger.error("ANKI_COLLECTION_FILE_PATH is not set in config. Cannot save Pexels image.")
+                return None
             img = Image.open(BytesIO(requests.get(image_url).content))
             img.save(image_path)
             return image_path
@@ -287,10 +318,10 @@ class FlashcardGenerator:
             prompt = IMAGE_GENERATION_PROMPT.format(word=word, gloss=gloss, pos=pos)
             
             response = self.client.images.generate(
-                model="gpt-image-1",
+                model=config.IMAGE_GENERATION_MODEL,
                 prompt=prompt,
-                size="1024x1024",
-                quality="low"
+                size=config.IMAGE_SIZE,
+                quality=config.IMAGE_QUALITY
             )
             
             # Get the base64 encoded image data
@@ -324,7 +355,7 @@ class FlashcardGenerator:
         cards.append({"front": word, "back": f'<img src="{image_path}">', "type": "basic"})
         return cards
 
-    def generate_flashcards(self, words_file: str, batch_size: int = 10) -> None:
+    def generate_flashcards(self, words_file: str, batch_size: int = config.DEFAULT_BATCH_SIZE) -> None:
         words = self.read_words(words_file)
         all_cards = []
         
@@ -354,30 +385,34 @@ class FlashcardGenerator:
             
             # Find existing image files for this word and determine the next number
             if word_type != "SIMPLE":
-                image_dir = ANKI_COLLECTION_FILE_PATH
-                existing_files = [f for f in os.listdir(image_dir) if f.startswith(f"{word}_image")]
-                
-                # Get the numbers from existing files
-                numbers = []
-                for file in existing_files:
-                    # Check for numbered image files
-                    match = re.search(r'_image_(\d+)\.png$', file)
-                    if match:
-                        numbers.append(int(match.group(1)))
-                    # Check for the base image file without number
-                    elif file == f"{word}_image.png":
-                        numbers.append(0)  # Treat base filename as number 0
-                
-                # Determine next number
-                next_num = 1 if not numbers else max(numbers) + 1
-                
-                # Create the new filename
-                if next_num == 1 and f"{word}_image.png" not in existing_files:
-                    new_filename = f"{word}_image.png"
+                if not config.ANKI_COLLECTION_FILE_PATH:
+                    logger.warning(f"ANKI_COLLECTION_FILE_PATH not set. Skipping AI image for {word}")
+                    image_path = None
                 else:
-                    new_filename = f"{word}_image_{next_num}.png"
-                
-                image_path = self.get_image(word, word_type, translation, word_obj)
+                    image_dir = config.ANKI_COLLECTION_FILE_PATH
+                    existing_files = [f for f in os.listdir(image_dir) if f.startswith(f"{word}_image")]
+                    
+                    # Get the numbers from existing files
+                    numbers = []
+                    for file in existing_files:
+                        # Check for numbered image files
+                        match = re.search(r'_image_(\d+)\.png$', file)
+                        if match:
+                            numbers.append(int(match.group(1)))
+                        # Check for the base image file without number
+                        elif file == f"{word}_image.png":
+                            numbers.append(0)  # Treat base filename as number 0
+                    
+                    # Determine next number
+                    next_num = 1 if not numbers else max(numbers) + 1
+                    
+                    # Create the new filename
+                    if next_num == 1 and f"{word}_image.png" not in existing_files:
+                        new_filename = f"{word}_image.png"
+                    else:
+                        new_filename = f"{word}_image_{next_num}.png"
+                    
+                    image_path = self.get_image(word, word_type, translation, word_obj)
             else:
                 image_path = self.get_image(word, word_type, translation, word_obj)
             
@@ -410,11 +445,11 @@ class FlashcardGenerator:
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         csv_path = os.path.join(self.output_dir, f"flashcards_{timestamp}.csv")
         with open(csv_path, 'w', newline='', encoding='utf-8') as file:
-            file.write('#separator:Tab\n')
-            file.write('#html:true\n')
-            file.write('#notetype column:1\n')
+            file.write(f'#separator:{config.CSV_SEPARATOR}\n')
+            file.write(f'#html:{str(config.CSV_HTML_ENABLED).lower()}\n')
+            file.write(f'#notetype column:{config.CSV_NOTETYPE_COLUMN}\n')
             fieldnames = ['type', '2', '3']
-            writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='\t')
+            writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter=config.CSV_SEPARATOR)
             for card in cards:
                 if card["type"] == "basic":
                     writer.writerow({"type": "Basic", "2": card["front"], "3": card["back"]})
@@ -425,9 +460,9 @@ class FlashcardGenerator:
 
 def main():
     parser = argparse.ArgumentParser(description='Generate Anki flashcards from BCS words.')
-    parser.add_argument('--words', type=str, default='../words.txt', help='Path to the input words file')
-    parser.add_argument('--output', type=str, default='../output', help='Output directory')
-    parser.add_argument('--batch-size', type=int, default=10, help='Number of words to process in each batch')
+    parser.add_argument('--words', type=str, default=config.DEFAULT_WORDS_FILE, help='Path to the input words file')
+    parser.add_argument('--output', type=str, default=config.DEFAULT_OUTPUT_DIR, help='Output directory for CSV flashcards')
+    parser.add_argument('--batch-size', type=int, default=config.DEFAULT_BATCH_SIZE, help='Number of words to process in each batch')
     args = parser.parse_args()
     generator = FlashcardGenerator(output_dir=args.output)
     generator.generate_flashcards(args.words, args.batch_size)
