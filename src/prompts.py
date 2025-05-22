@@ -64,34 +64,21 @@ Return only the English translation, no other text.
 
 # Prompt for generating images
 IMAGE_GENERATION_PROMPT = """
-Create an image that visually captures the meaning of the BCS (Bosnian/Croatian/Serbian) word: "{word}".
+Create a didactic illustration of the word "{word}" to be used in a flashcard for language learners.
 
-Use the following rules:
+• Language of the target word: Bosnian / Croatian / Serbian (BCS)
+• Target word: "{word}"
+• Part of speech: {pos}
 
-1. **Interpretation style**:
-   - If the word is abstract, emotional, or polysemous, illustrate it using a recognizable situation, character, or emotional metaphor.
-      - Show a **human figure, natural setting, or object in context** that evokes the feeling or concept.
-      - Prefer narrative or emotional metaphor (e.g., a person walking alone under stars for “sloboda”), not visual abstraction.
-   - If the word is concrete, simple, or object-based, depict it literally and clearly.
-
-2. **Visual clarity**:
-   - The image must be **distinctive and unambiguous**, so a language learner can associate it confidently with this word.
-   - Avoid scenes that could plausibly represent other common vocabulary.
-
-3. **No text**:
-   - Do NOT include any written language or labels in the image.
-
-4. **Stylistic consistency by part of speech**:
-   Apply these visual conventions based on the part of speech (if known or inferable from the word):
-
-   - **Verb**: Depict action or transformation over time. Use a comic strip, storyboard, or a subject in dynamic motion across a sequence.
-   - **Noun**: Show a centered object or scene, clearly framed.
-   - **Adjective**: 
-      - Show a person or character with a facial expression that clearly conveys the adjective's emotional or descriptive quality.
-      - Use the background environment, color palette, or visual texture to reinforce the mood or tone — e.g., stormy skies for “tužan”, vibrant flowers for “vedar”, rigid geometric patterns for “strogi”.
-      - The figure should be visually dominant, but the background must add symbolic weight to the meaning.
-   - **Adverb**: Show a scene with overlay effects (e.g., motion blur, shadows, symbols of time or intensity).
-   - **Function word** (e.g., preposition, pronoun): Use abstract diagrams, arrows, or mirrored/reflexive imagery to illustrate relationships or directionality.
+MANDATORY RULES
+1. Depict the core meaning of the word as used in everyday BCS, avoiding idiomatic or metaphorical extensions unless central to its primary sense.
+2. Apply visual conventions by part of speech:
+   - Verb   → storyboard showing the action’s progression.
+   - Noun   → one centred object or scene occupying ≥40 % of the canvas.
+   - Adjective → show an appropriate and relevant object that is modified by the adjective.
+   - Adverb  → single scene with overlay effect (motion blur, speed lines, etc.).
+   - Function word → minimal diagram (arrows, linking shapes) on blank background.
+3. No text of ANY KIND on the image.
 """
 
 # Prompt for canonicalizing words
@@ -108,4 +95,278 @@ You are given a list of words in Bosnian/Croatian/Serbian. For each word, return
 
 Input:
 {words}
+"""
+
+PROMPT = """
+You'll receive a list of BCS words (may contain misspellings). For each, return a JSON with:
+
+1. Canonical form — Correct spelling, lowercase unless proper noun. Use dictionary base:
+   - Noun → nominative singular
+   - Verb → infinitive
+   - Adjective → masc. nom. sg.
+   - Other → dictionary form
+
+2. Part of speech — One of:
+   - "imenica"
+   - "glagol"
+   - "pridjev"
+   - "prilog"
+   - "zamjenica"
+   - "prijedlog"
+   - "veznik"
+   - "uzvik"
+
+3. Definition
+
+Write a definition suitable for language learners using Anki.
+It should be short and clear. If the word has multiple senses, briefly mention them.
+Use natural, conversational language. Avoid overly academic phrasing.
+If possible, include both literal and abstract meanings.
+
+Note:
+- Include key grammatical info in parentheses:
+  - Verbs: (glagol, [aspect], {{{{c1::1st person present}}}})
+  - Nouns: (imenica); add gender only if irregular, and note if uncountable
+  - Adjectives: (pridjev, [degree])
+- If regional usage is notable (e.g. only in Croatia, archaic, dialectal), briefly mention it at the end. 
+- Use standard ijekavian
+- Use cloze format - start the definition with the word in cloze brackets: `{{{{c1::word}}}}`.
+  If the word appears multiple times in the definition, use cloze brackets for each instance.
+
+**Examples:**
+- `{{{{c1::Prodrijeti}}}} ({{{{c1::prodrijem}}}}) (glagol, svršeni vid) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju).`
+- `{{{{c1::Blagostanje}}}} (imenica, nebrojivo) označava stanje u kojem osoba ili zajednica ima dovoljno sredstava za udoban, siguran i zadovoljavajući život.`
+- `{{{{c1::Najvažniji}}}} (pridjev, superlativ) opisuje ono što ima najveći značaj ili prioritet u odnosu na sve druge stvari u određenom kontekstu.`
+- `{{{{c1::Ćuprija}}}} (imenica, turcizam) označava most; riječ je arhaična i danas se uglavnom koristi u Bosni.`
+
+4. Example sentences
+
+Generate exactly 3 example sentences in BCS (ijekavian variant) using the target word.
+Use different grammatical forms of the word (e.g., for verbs: vary tense, person, or mood; for nouns: vary case or number).
+Wrap all inflected forms of the word in cloze brackets: {{{{c1::...}}}}
+Each sentence should be ~10 words for easy memorization.
+
+Use vivid imagery or strong emotional content to make the sentence memorable.
+Think: scenes that evoke touch, smell, light, feeling, surprise, or desire.
+
+Use a positive or life-affirming tone when appropriate.
+
+Examples
+
+Neovisnost:
+{{{{c1::Neovisnost}}}} jedne zemlje vrijedi više od zlata.
+Putujući sama, osjetila je moć {{{{c1::neovisnosti}}}}.
+Njena {{{{c1::neovisnost}}}} plašila je one koji su voljeli kontrolu.
+
+Prozvati:
+Majka me {{{{c1::prozvala}}}} jer sam ukrao smokve.
+Publika ga je {{{{c1::prozvala}}}} herojem nakon govora.
+Starac ju je {{{{c1::prozvao}}}} anđelom u posljednjem dahu.
+
+5. **Word type**
+
+This is for deciding whether to use a real-world photo (via Pexels) or
+generate a symbolic image with AI for the purpose of generating Anki flashcards for language learning purposes.
+
+Classify the word as:  
+- SIMPLE: a clearly visible, concrete object likely to yield useful photo results on Pexels (e.g., "jabuka", "kuća")  
+- COMPLEX: an abstract concept, action, quality, or emotion better suited to symbolic or
+  AI-generated imagery (e.g., "ljubav", "misliti", "sloboda")  
+
+Return only "SIMPLE" or "COMPLEX". If unsure, choose "COMPLEX".
+
+6. **English translation**
+
+Translate the core meaning of the word into English.
+Use only one or two words — the most relevant translation for a language learner.
+
+---
+
+Return your output as a single **JSON array**, one object per word, in the following format:
+
+[
+  {{
+    "word": "prodrijes",
+    "canonical_form": "prodrijeti",
+    "part_of_speech": "glagol",
+    "definition": "{{c1::Prodrijeti}} (glagol, svršeni vid, {{c1::prodrijem}}) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju).",
+    "example_sentences": [
+      "Sunčeva svjetlost je uspjela {{{{c1::prodrijeti}}}} kroz guste oblake.",
+      "Njene riječi su duboko {{{{c1::prodrle}}}} u moje misli.",
+      "Nakon dugog razmišljanja, konačno sam uspio {{{{c1::prodrijeti}}}} do suštine problema."
+    ],
+    "word_type": "COMPLEX",
+    "translation": "penetrate"
+  }},
+  {{
+  "word": "vrijedan",
+  "canonical_form": "vrijedan",
+  "part_of_speech": "pridjev",
+  "definition": "{{c1::Vrijedan}} (pridjev, pozitivan) opisuje osobu, predmet ili radnju koja ima veliku vrijednost, važnost ili korisnost — može značiti i da neko marljivo radi.",
+  "example_sentences": [
+    "Tvoj savjet bio je {{c1::vrijedan}} svakog truda i vremena.",
+    "Ona je {{c1::vrijedna}} djevojka koja stalno pomaže drugima.",
+    "Na sastanku je predložio {{c1::vrijednu}} i praktičnu ideju."
+    ],
+    "word_type": "COMPLEX",
+    "translation": "valuable"
+  }},
+  ...
+]
+
+❗ Important: Return only the raw JSON array. Your response must begin with `[` and end with `]` so it can be parsed directly with a JSON parser.
+
+Word list: {word_list}
+"""
+
+PROMPT_STRUCTURAL_FACTUAL = """
+You'll receive a list of BCS words (may contain misspellings). For each word in the input list, return a JSON object containing the original `word` and the following fields: `canonical_form`, `part_of_speech`, `word_type`, and `translation`.
+
+1.  **`word`**: The original word from the input list.
+2.  **`canonical_form`**: Correct spelling, lowercase unless it's a proper noun. Use the dictionary base form:
+    *   Noun → nominative singular
+    *   Verb → infinitive
+    *   Adjective → masculine nominative singular
+    *   Other → standard dictionary form
+3.  **`part_of_speech`**: Classify into one of:
+    *   "imenica"
+    *   "glagol"
+    *   "pridjev"
+    *   "prilog"
+    *   "zamjenica"
+    *   "prijedlog"
+    *   "veznik"
+    *   "uzvik"
+4.  **`word_type`**: This is for deciding image generation strategy. Classify the word as:
+    *   "SIMPLE": a clearly visible, concrete object likely to yield useful photo results (e.g., "jabuka", "kuća").
+    *   "COMPLEX": an abstract concept, action, quality, or emotion better suited to symbolic or AI-generated imagery (e.g., "ljubav", "misliti", "sloboda").
+    If unsure, choose "COMPLEX".
+5.  **`translation`**: Translate the core meaning of the word into English. Use only one or two words — the most relevant translation for a language learner.
+
+---
+
+Return your output as a single **JSON array**, one object per word.
+Your response must begin with `[` and end with `]` so it can be parsed directly.
+
+**Example Output Format:**
+[
+  {
+    "word": "prodrijes", // original input word
+    "canonical_form": "prodrijeti",
+    "part_of_speech": "glagol",
+    "word_type": "COMPLEX",
+    "translation": "penetrate"
+  },
+  {
+    "word": "vrijedan",
+    "canonical_form": "vrijedan",
+    "part_of_speech": "pridjev",
+    "word_type": "COMPLEX",
+    "translation": "valuable"
+  }
+  // ... more objects for other words in the list
+]
+
+Word list: {word_list}
+"""
+
+PROMPT_SEMANTIC_GENERATIVE = """
+You'll receive a list of BCS words. For each word in the input list, return a JSON object containing the original `word` and its `definition`.
+
+1.  **`word`**: The original word from the input list.
+2.  **`definition`**:
+    *   Write a definition suitable for language learners using Anki.
+    *   It should be short and clear. If the word has multiple senses, briefly mention them.
+    *   Use natural, conversational language. Avoid overly academic phrasing.
+    *   If possible, include both literal and abstract meanings.
+    *   Start the definition with the word in cloze brackets: `{{{{c1::word}}}}`. If the word appears multiple times in the definition, use cloze brackets for each instance.
+    *   Include key grammatical info in parentheses within the definition:
+        *   Verbs: (glagol, [aspect], {{{{c1::1st person present}}}})
+        *   Nouns: (imenica); add gender only if irregular, and note if uncountable
+        *   Adjectives: (pridjev, [degree])
+    *   If regional usage is notable (e.g. only in Croatia, archaic, dialectal), briefly mention it at the end.
+    *   Use standard ijekavian.
+
+---
+
+Return your output as a single **JSON array**, one object per word.
+Your response must begin with `[` and end with `]` so it can be parsed directly.
+
+**Example Definitions:**
+- `{{{{c1::Prodrijeti}}}} (glagol, svršeni vid, {{{{c1::prodrijem}}}}) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju).`
+- `{{{{c1::Blagostanje}}}} (imenica, nebrojivo) označava stanje u kojem osoba ili zajednica ima dovoljno sredstava za udoban, siguran i zadovoljavajući život.`
+- `{{{{c1::Najvažniji}}}} (pridjev, superlativ) opisuje ono što ima najveći značaj ili prioritet u odnosu na sve druge stvari u određenom kontekstu.`
+- `{{{{c1::Ćuprija}}}} (imenica, turcizam) označava most; riječ je arhaična i danas se uglavnom koristi u Bosni.`
+
+**Example Output Format:**
+[
+  {
+    "word": "prodrijes", // original input word
+    "definition": "{{c1::Prodrijeti}} (glagol, svršeni vid, {{c1::prodrijem}}) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju)."
+  },
+  {
+    "word": "vrijedan",
+    "definition": "{{c1::Vrijedan}} (pridjev, pozitivan) opisuje osobu, predmet ili radnju koja ima veliku vrijednost, važnost ili korisnost — može značiti i da neko marljivo radi."
+  }
+  // ... more objects for other words in the list
+]
+
+Word list: {word_list}
+"""
+
+PROMPT_STYLISTIC_NARRATIVE = """
+You'll receive a list of BCS words. For each word in the input list, return a JSON object containing the original `word` and a list of three `example_sentences`.
+
+1.  **`word`**: The original word from the input list.
+2.  **`example_sentences`**:
+    *   Generate exactly 3 example sentences in BCS (ijekavian variant) using the target word.
+    *   Use different grammatical forms of the word (e.g., for verbs: vary tense, person, or mood; for nouns: vary case or number).
+    *   Wrap all inflected forms of the word in cloze brackets: `{{{{c1::...}}}}`
+    *   Each sentence should be ~10 words for easy memorization.
+    *   Use vivid imagery or strong emotional content to make the sentence memorable. Think: scenes that evoke touch, smell, light, feeling, surprise, or desire.
+    *   Use a positive or life-affirming tone when appropriate.
+
+---
+
+Return your output as a single **JSON array**, one object per word.
+Your response must begin with `[` and end with `]` so it can be parsed directly.
+
+**Example Sentences Sets:**
+
+For "neovisnost":
+[
+  "{{{{c1::Neovisnost}}}} jedne zemlje vrijedi više od zlata.",
+  "Putujući sama, osjetila je moć {{{{c1::neovisnosti}}}}.",
+  "Njena {{{{c1::neovisnost}}}} plašila je one koji su voljeli kontrolu."
+]
+
+For "prozvati":
+[
+  "Majka me {{{{c1::prozvala}}}} jer sam ukrao smokve.",
+  "Publika ga je {{{{c1::prozvala}}}} herojem nakon govora.",
+  "Starac ju je {{{{c1::prozvao}}}} anđelom u posljednjem dahu."
+]
+
+**Example Output Format:**
+[
+  {
+    "word": "prodrijes", // original input word
+    "example_sentences": [
+      "Sunčeva svjetlost je uspjela {{{{c1::prodrijeti}}}} kroz guste oblake.",
+      "Njene riječi su duboko {{{{c1::prodrle}}}} u moje misli.",
+      "Nakon dugog razmišljanja, konačno sam uspio {{{{c1::prodrijeti}}}} do suštine problema."
+    ]
+  },
+  {
+    "word": "vrijedan",
+    "example_sentences": [
+      "Tvoj savjet bio je {{c1::vrijedan}} svakog truda i vremena.",
+      "Ona je {{c1::vrijedna}} djevojka koja stalno pomaže drugima.",
+      "Na sastanku je predložio {{c1::vrijednu}} i praktičnu ideju."
+    ]
+  }
+  // ... more objects for other words in the list
+]
+
+Word list: {word_list}
 """
