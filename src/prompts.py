@@ -28,7 +28,8 @@ the original `word` and the following fields: `canonical_form`,
 ---
 
 Return your output as a single **JSON array**, one object per word.
-Your response must begin with `[` and end with `]` so it can be parsed directly.
+Your response must be *only* the JSON array. It must start with `[` and end with `]`.
+Do not include any other text, explanations, or markdown formatting (like `json` or ```) before or after the JSON array.
 
 **Example Output Format:**
 [
@@ -72,7 +73,8 @@ You'll receive a list of BCS words. For each word in the input list, return a JS
 ---
 
 Return your output as a single **JSON array**, one object per word.
-Your response must begin with `[` and end with `]` so it can be parsed directly.
+Your response must be *only* the JSON array. It must start with `[` and end with `]`.
+Do not include any other text, explanations, or markdown formatting (like `json` or ```) before or after the JSON array.
 
 **Example Definitions:**
 - `{{{{c1::Prodrijeti}}}} (glagol, svršeni vid, {{{{c1::prodrijem}}}}) znači proći kroz neku prepreku ili ući duboko u nešto — fizički (kao svjetlost kroz tamu), emocionalno (dirnuti nekoga), ili mentalno (dokučiti neku ideju).`
@@ -111,7 +113,8 @@ You'll receive a list of BCS words. For each word in the input list, return a JS
 ---
 
 Return your output as a single **JSON array**, one object per word.
-Your response must begin with `[` and end with `]` so it can be parsed directly.
+Your response must be *only* the JSON array. It must start with `[` and end with `]`.
+Do not include any other text, explanations, or markdown formatting (like `json` or ```) before or after the JSON array.
 
 **Example Sentences Sets:**
 
