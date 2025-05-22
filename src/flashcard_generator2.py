@@ -214,6 +214,13 @@ class FlashcardGenerator:
                all(k in data for k in ["canonical_form", "part_of_speech", "word_type", "translation"]) and \
                "definition" in data and \
                "example_sentences" in data:
+                # Log the word and its translation
+                canonical_form = data.get("canonical_form", word_str) # Use canonical_form if available
+                translation = data.get("translation")
+                if translation:
+                    logger.info(f"Processed: '{canonical_form}' -> Translation: '{translation}'")
+                else:
+                    logger.info(f"Processed: '{canonical_form}' (No translation found in data)")
                 final_batch_results.append(data)
             else:
                 logger.warning(f"Word '{word_str}' is missing some data after merging and will be skipped. Collected data: {data}")
