@@ -15,7 +15,12 @@ import requests
 from PIL import Image
 from dotenv import load_dotenv
 
-from prompts import IMAGE_GENERATION_PROMPT, PROMPT_STRUCTURAL_FACTUAL, PROMPT_SEMANTIC_GENERATIVE, PROMPT_STYLISTIC_NARRATIVE
+from prompts import (
+    IMAGE_GENERATION_PROMPT,
+    PROMPT_WORD_METADATA,
+    PROMPT_WORD_DEFINITION,
+    PROMPT_EXAMPLE_SENTENCES,
+)
 
 load_dotenv()
 
@@ -122,7 +127,7 @@ class FlashcardGenerator:
         
         # --- 1. Structural Data ---
         logger.info(f"Requesting structural data for {len(words)} words...")
-        prompt_structural_content = PROMPT_STRUCTURAL_FACTUAL.format(word_list=word_list_str)
+        prompt_structural_content = PROMPT_WORD_METADATA.format(word_list=word_list_str)
         structural_results = self._make_api_call_and_parse(prompt_structural_content, model, temperature, len(words))
         
         if structural_results:
@@ -140,7 +145,7 @@ class FlashcardGenerator:
 
         # --- 2. Semantic Data (Definition) ---
         logger.info(f"Requesting semantic data (definitions) for {len(words)} words...")
-        prompt_semantic_content = PROMPT_SEMANTIC_GENERATIVE.format(word_list=word_list_str)
+        prompt_semantic_content = PROMPT_WORD_DEFINITION.format(word_list=word_list_str)
         semantic_results = self._make_api_call_and_parse(prompt_semantic_content, model, temperature, len(words))
 
         if semantic_results:
@@ -158,7 +163,7 @@ class FlashcardGenerator:
         
         # --- 3. Stylistic Data (Examples) ---
         logger.info(f"Requesting stylistic data (example sentences) for {len(words)} words...")
-        prompt_stylistic_content = PROMPT_STYLISTIC_NARRATIVE.format(word_list=word_list_str)
+        prompt_stylistic_content = PROMPT_EXAMPLE_SENTENCES.format(word_list=word_list_str)
         stylistic_results = self._make_api_call_and_parse(prompt_stylistic_content, model, temperature, len(words))
 
         if stylistic_results:
