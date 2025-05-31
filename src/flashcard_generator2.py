@@ -23,7 +23,7 @@ from prompts import (
 )
 
 # Import the new config module
-import src.config as config
+import config
 
 # Helper function to ensure a directory exists
 def _ensure_dir_exists(file_path: str):
