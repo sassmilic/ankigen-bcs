@@ -27,7 +27,7 @@ The output is a CSV file formatted for batch importing into Anki.
 5. Run the flashcard generator script:
 
 ```
-python flashcard_generator.py
+python flashcard_generator2.py
 ```
 
 ## TODO
