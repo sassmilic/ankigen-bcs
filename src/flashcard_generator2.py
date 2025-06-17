@@ -61,10 +61,11 @@ def save_history_entry(entry: Dict):
         f.write(json.dumps(entry) + "\n")
 
 class FlashcardGenerator:
-    def __init__(self, output_dir: str = None):
+    def __init__(self, output_dir: str = None, simple_nouns: bool = False):
         self.api_key = config.OPENAI_API_KEY
         self.client = openai.OpenAI(api_key=self.api_key)
         self.output_dir = output_dir if output_dir is not None else config.DEFAULT_OUTPUT_DIR
+        self.simple_nouns = simple_nouns
         
         # Rate limiting for image generation
         self.image_rate_limit = config.IMAGE_API_RATE_LIMIT
@@ -169,40 +170,46 @@ class FlashcardGenerator:
             return []
 
         # --- 2. Semantic Data (Definition) ---
-        logger.info(f"Requesting semantic data (definitions) for {len(words)} words...")
-        prompt_semantic_content = PROMPT_WORD_DEFINITION.format(word_list=word_list_str)
-        semantic_results = self._make_api_call_and_parse(prompt_semantic_content, model, temperature, len(words))
+        if not self.simple_nouns:
+            logger.info(f"Requesting semantic data (definitions) for {len(words)} words...")
+            prompt_semantic_content = PROMPT_WORD_DEFINITION.format(word_list=word_list_str)
+            semantic_results = self._make_api_call_and_parse(prompt_semantic_content, model, temperature, len(words))
 
-        if semantic_results:
-            for item in semantic_results:
-                original_word = item.get("word")
-                if original_word and original_word in merged_data:
-                    merged_data[original_word].update(item)
-                elif original_word:
-                    logger.warning(f"Word '{original_word}' from semantic response not in original batch: {words}")
-                else:
-                    logger.warning(f"Item from semantic response missing 'word' key: {item}")
+            if semantic_results:
+                for item in semantic_results:
+                    original_word = item.get("word")
+                    if original_word and original_word in merged_data:
+                        merged_data[original_word].update(item)
+                    elif original_word:
+                        logger.warning(f"Word '{original_word}' from semantic response not in original batch: {words}")
+                    else:
+                        logger.warning(f"Item from semantic response missing 'word' key: {item}")
+            else:
+                logger.error(f"Failed to get semantic data for batch starting with '{words[0] if words else 'N/A'}'. This batch will be skipped.")
+                return []
         else:
-            logger.error(f"Failed to get semantic data for batch starting with '{words[0] if words else 'N/A'}'. This batch will be skipped.")
-            return []
+            logger.info(f"Skipping definition generation for {len(words)} simple nouns...")
         
         # --- 3. Stylistic Data (Examples) ---
-        logger.info(f"Requesting stylistic data (example sentences) for {len(words)} words...")
-        prompt_stylistic_content = PROMPT_EXAMPLE_SENTENCES.format(word_list=word_list_str)
-        stylistic_results = self._make_api_call_and_parse(prompt_stylistic_content, model, temperature, len(words))
+        if not self.simple_nouns:
+            logger.info(f"Requesting stylistic data (example sentences) for {len(words)} words...")
+            prompt_stylistic_content = PROMPT_EXAMPLE_SENTENCES.format(word_list=word_list_str)
+            stylistic_results = self._make_api_call_and_parse(prompt_stylistic_content, model, temperature, len(words))
 
-        if stylistic_results:
-            for item in stylistic_results:
-                original_word = item.get("word")
-                if original_word and original_word in merged_data:
-                    merged_data[original_word].update(item)
-                elif original_word:
-                    logger.warning(f"Word '{original_word}' from stylistic response not in original batch: {words}")
-                else:
-                    logger.warning(f"Item from stylistic response missing 'word' key: {item}")
+            if stylistic_results:
+                for item in stylistic_results:
+                    original_word = item.get("word")
+                    if original_word and original_word in merged_data:
+                        merged_data[original_word].update(item)
+                    elif original_word:
+                        logger.warning(f"Word '{original_word}' from stylistic response not in original batch: {words}")
+                    else:
+                        logger.warning(f"Item from stylistic response missing 'word' key: {item}")
+            else:
+                logger.error(f"Failed to get stylistic data for batch starting with '{words[0] if words else 'N/A'}'. This batch will be skipped.")
+                return []
         else:
-            logger.error(f"Failed to get stylistic data for batch starting with '{words[0] if words else 'N/A'}'. This batch will be skipped.")
-            return []
+            logger.info(f"Skipping example sentence generation for {len(words)} simple nouns...")
 
         # Assemble final results for the batch, ensuring all parts are present
         final_batch_results = []
@@ -211,9 +218,19 @@ class FlashcardGenerator:
             # Check for essential keys from each prompt's contribution
             # The 'word' key is already used for merging and is implicitly required.
             if data and \
-               all(k in data for k in ["canonical_form", "part_of_speech", "word_type", "translation"]) and \
-               "definition" in data and \
-               "example_sentences" in data:
+               all(k in data for k in ["canonical_form", "part_of_speech", "word_type", "translation"]):
+                
+                # For simple nouns, we don't need definition and example_sentences
+                if self.simple_nouns:
+                    # Add empty definition and example_sentences for simple nouns
+                    data["definition"] = ""
+                    data["example_sentences"] = []
+                else:
+                    # For complex words, require definition and example_sentences
+                    if "definition" not in data or "example_sentences" not in data:
+                        logger.warning(f"Word '{word_str}' is missing definition or example_sentences and will be skipped. Collected data: {data}")
+                        continue
+                
                 # Log the word and its translation
                 canonical_form = data.get("canonical_form", word_str) # Use canonical_form if available
                 translation = data.get("translation")
@@ -356,17 +373,27 @@ class FlashcardGenerator:
         cards = []
         word = word_obj["canonical_form"]
 
-        cards.append({"word": word, "text": word_obj["definition"], "type": "cloze"})
-        examples_text = "<ul>" + "".join(["<li>" + ex + "</li>" for ex in word_obj["example_sentences"]]) + "</ul>"
-        cards.append({"word": word, "text": examples_text, "type": "cloze"})
-        cards.append({"front": word, "back": f'<img src="{image_path}">', "type": "basic"})
+        if self.simple_nouns:
+            # For simple nouns, only create image-to-word cards
+            cards.append({"front": word, "back": f'<img src="{image_path}">', "type": "basic"})
+        else:
+            # For complex words, create all card types
+            cards.append({"word": word, "text": word_obj["definition"], "type": "cloze"})
+            examples_text = "<ul>" + "".join(["<li>" + ex + "</li>" for ex in word_obj["example_sentences"]]) + "</ul>"
+            cards.append({"word": word, "text": examples_text, "type": "cloze"})
+            cards.append({"front": word, "back": f'<img src="{image_path}">', "type": "basic"})
+        
         return cards
 
     def generate_flashcards(self, words_file: str, batch_size: int = config.DEFAULT_BATCH_SIZE) -> None:
         words = self.read_words(words_file)
         all_cards = []
         
-        logger.info(f"Processing {len(words)} words in batches of {batch_size}")
+        if self.simple_nouns:
+            logger.info(f"Processing {len(words)} simple concrete nouns in batches of {batch_size} (image-to-word cards only)")
+        else:
+            logger.info(f"Processing {len(words)} words in batches of {batch_size}")
+        
         results = self.process_words_in_batches(words, batch_size)
         
         logger.info(f"Creating flashcards for {len(results)} processed words")
@@ -389,6 +416,10 @@ class FlashcardGenerator:
             word = word_obj.get("canonical_form")
             word_type = word_obj.get("word_type")
             translation = word_obj.get("translation", word)
+            
+            # For simple nouns mode, treat all words as SIMPLE type for image generation
+            if self.simple_nouns:
+                word_type = "SIMPLE"
             
             # Find existing image files for this word and determine the next number
             if word_type != "SIMPLE":
@@ -470,8 +501,9 @@ def main():
     parser.add_argument('--words', type=str, default=config.DEFAULT_WORDS_FILE, help='Path to the input words file')
     parser.add_argument('--output', type=str, default=config.DEFAULT_OUTPUT_DIR, help='Output directory for CSV flashcards')
     parser.add_argument('--batch-size', type=int, default=config.DEFAULT_BATCH_SIZE, help='Number of words to process in each batch')
+    parser.add_argument('--simple-nouns', action='store_true', help='Skip definition and example sentence generation for simple nouns')
     args = parser.parse_args()
-    generator = FlashcardGenerator(output_dir=args.output)
+    generator = FlashcardGenerator(output_dir=args.output, simple_nouns=args.simple_nouns)
     generator.generate_flashcards(args.words, args.batch_size)
 
 if __name__ == "__main__":

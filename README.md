@@ -13,6 +13,8 @@ Images are either retrieved from Pexels or AI-generated, depending on the word t
 
 The output is a CSV file formatted for batch importing into Anki.
 
+**New:** You can now use the `--simple-nouns` option to generate only image-to-word cards for simple concrete nouns (e.g., apple, house), skipping definitions and example sentences.
+
 ## Usage
 
 ### Setup
@@ -29,6 +31,16 @@ The output is a CSV file formatted for batch importing into Anki.
 ```
 python flashcard_generator.py
 ```
+
+### Simple Concrete Nouns Mode
+
+If you want to generate flashcards for simple concrete nouns (like fruits, vegetables, or objects) and only need image-to-word cards (no definitions or example sentences), use the `--simple-nouns` flag:
+
+```
+python src/flashcard_generator2.py --words your_words.txt --simple-nouns
+```
+
+This will skip definition and example sentence generation, and only create image-to-word cards for each word in your list.
 
 ## TODO
 
